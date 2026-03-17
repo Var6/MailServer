@@ -4,12 +4,8 @@ const envSchema = z.object({
   NODE_ENV:              z.enum(["development", "production", "test"]).default("production"),
   PORT:                  z.coerce.number().default(3000),
 
-  // Database
-  DB_HOST:               z.string().default("mariadb"),
-  DB_PORT:               z.coerce.number().default(3306),
-  DB_NAME:               z.string().default("mailserver"),
-  DB_USER:               z.string(),
-  DB_PASS:               z.string(),
+  // MongoDB
+  MONGO_URI:             z.string().default("mongodb://mailserver:changeme@mongodb:27017/mailserver?authSource=mailserver"),
 
   // Redis
   REDIS_HOST:            z.string().default("redis"),
@@ -29,6 +25,9 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET:    z.string().min(32),
   SESSION_TTL_SECONDS:   z.coerce.number().default(900),
   IMAP_POOL_IDLE_TTL_MS: z.coerce.number().default(600_000),
+
+  // Internal auth token (for Dovecot checkpassword → API)
+  INTERNAL_AUTH_TOKEN:   z.string().min(16).default("change-me-internal-secret"),
 
   // Nextcloud
   NEXTCLOUD_URL:              z.string().default("http://nextcloud"),

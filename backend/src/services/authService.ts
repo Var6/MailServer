@@ -1,44 +1,22 @@
-import mysql from "mysql2/promise";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
+import { User, Domain, type IUser } from "../models/User.js";
 import { config } from "../config/index.js";
-import type { AuthTokenPayload, MailUser } from "../types/index.js";
+import type { AuthTokenPayload } from "../types/index.js";
 
-let pool: mysql.Pool | null = null;
-
-function getPool(): mysql.Pool {
-  if (!pool) {
-    pool = mysql.createPool({
-      host: config.DB_HOST,
-      port: config.DB_PORT,
-      database: config.DB_NAME,
-      user: config.DB_USER,
-      password: config.DB_PASS,
-      waitForConnections: true,
-      connectionLimit: 10,
-    });
-  }
-  return pool;
+export async function verifyCredentials(email: string, password: string): Promise<IUser | null> {
+  const user = await User.findOne({ email: email.toLowerCase(), active: true });
+  if (!user) return null;
+  const valid = await argon2.verify(user.password, password);
+  return valid ? user : null;
 }
 
-export async function verifyCredentials(email: string, password: string): Promise<MailUser | null> {
-  const [rows] = await getPool().execute<mysql.RowDataPacket[]>(
-    "SELECT id, email, domain_id, quota_mb, password AS hash FROM virtual_users WHERE email = ? AND active = 1",
-    [email]
-  );
-  if (!rows.length) return null;
-  const user = rows[0];
-  const valid = await argon2.verify(user.hash as string, password);
-  if (!valid) return null;
-  return { id: user.id, email: user.email, domain_id: user.domain_id, quota_mb: user.quota_mb };
-}
-
-export function issueAccessToken(user: MailUser): string {
-  const payload: AuthTokenPayload = { sub: user.email, domain: user.email.split("@")[1] };
+export function issueAccessToken(user: IUser): string {
+  const payload: AuthTokenPayload = { sub: user.email, domain: user.domain };
   return jwt.sign(payload, config.JWT_SECRET, { expiresIn: "15m" });
 }
 
-export function issueRefreshToken(user: MailUser): string {
+export function issueRefreshToken(user: IUser): string {
   return jwt.sign({ sub: user.email }, config.JWT_REFRESH_SECRET, { expiresIn: "7d" });
 }
 
@@ -50,18 +28,28 @@ export function verifyRefreshToken(token: string): { sub: string } {
   return jwt.verify(token, config.JWT_REFRESH_SECRET) as { sub: string };
 }
 
-export async function getUserByEmail(email: string): Promise<MailUser | null> {
-  const [rows] = await getPool().execute<mysql.RowDataPacket[]>(
-    "SELECT id, email, domain_id, quota_mb FROM virtual_users WHERE email = ? AND active = 1",
-    [email]
-  );
-  return rows.length ? (rows[0] as MailUser) : null;
+export async function getUserByEmail(email: string): Promise<IUser | null> {
+  return User.findOne({ email: email.toLowerCase(), active: true });
 }
 
-export async function createUser(email: string, password: string, domainId: number, quotaMb = 2048): Promise<void> {
+export async function createUser(
+  email: string,
+  password: string,
+  quotaMb = 2048,
+  displayName?: string
+): Promise<IUser> {
+  const domain = email.split("@")[1];
+  // Ensure domain exists
+  await Domain.findOneAndUpdate({ name: domain }, { name: domain, active: true }, { upsert: true });
   const hash = await argon2.hash(password, { type: argon2.argon2id });
-  await getPool().execute(
-    "INSERT INTO virtual_users (domain_id, email, password, quota_mb) VALUES (?, ?, ?, ?)",
-    [domainId, email, hash, quotaMb]
-  );
+  return User.findOneAndUpdate(
+    { email: email.toLowerCase() },
+    { email: email.toLowerCase(), password: hash, domain, quotaMb, displayName, active: true },
+    { upsert: true, new: true }
+  ) as Promise<IUser>;
+}
+
+export async function domainExists(domain: string): Promise<boolean> {
+  const d = await Domain.findOne({ name: domain.toLowerCase(), active: true });
+  return !!d;
 }

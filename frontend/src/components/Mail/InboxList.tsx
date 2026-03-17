@@ -1,75 +1,149 @@
-import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { Paperclip, Star } from "lucide-react";
-import { getMessages } from "../../api/mailApi.ts";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Star, Paperclip, RefreshCw } from "lucide-react";
+import { getMessages, flagMessage } from "../../api/mailApi.ts";
 import { useMailStore } from "../../store/index.ts";
+import { useToastStore } from "../../store/index.ts";
+import { formatMailDate, avatarColor, senderInitial, senderName, stripHtml } from "../../lib/utils.ts";
+import { MailListSkeleton } from "../ui/Skeleton.tsx";
 import type { MailHeader } from "../../types/index.ts";
 
 export default function InboxList() {
   const { selectedFolder, selectedUid, selectMessage } = useMailStore();
+  const { addToast } = useToastStore();
+  const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["messages", selectedFolder, 1],
     queryFn: () => getMessages(selectedFolder, 1, 50),
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-        Loading...
-      </div>
-    );
-  }
+  const starMutation = useMutation({
+    mutationFn: ({ uid, add }: { uid: number; add: boolean }) =>
+      flagMessage(uid, selectedFolder, "\\Flagged", add),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["messages", selectedFolder] }),
+    onError: () => addToast("Failed to update star", "error"),
+  });
 
   const messages = data?.messages ?? [];
+  const total = data?.total ?? 0;
 
   return (
-    <div className="w-72 flex-shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
-      <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-        <span className="font-medium text-sm">{selectedFolder}</span>
-        <span className="text-xs text-gray-400">{data?.total ?? 0}</span>
+    <div className="w-80 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
+      {/* Toolbar */}
+      <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <span className="font-medium text-[#202124] text-sm">{selectedFolder}</span>
+          {total > 0 && (
+            <span className="ml-2 text-xs text-gray-400">{total}</span>
+          )}
+        </div>
+        <button
+          onClick={() => refetch()}
+          className={`p-1.5 rounded-full hover:bg-gray-100 text-gray-400 transition-colors ${isFetching ? "animate-spin" : ""}`}
+          title="Refresh"
+        >
+          <RefreshCw size={14} />
+        </button>
       </div>
-      {messages.length === 0 && (
-        <div className="p-6 text-center text-gray-400 text-sm">No messages</div>
-      )}
-      {messages.map((msg: MailHeader) => (
-        <MessageRow
-          key={msg.uid}
-          msg={msg}
-          selected={selectedUid === msg.uid}
-          onClick={() => selectMessage(msg.uid)}
-        />
-      ))}
+
+      {/* Message list */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+        {isLoading && <MailListSkeleton />}
+
+        {!isLoading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-500">No messages</p>
+              <p className="text-xs mt-0.5">Your {selectedFolder.toLowerCase()} is empty</p>
+            </div>
+          </div>
+        )}
+
+        {messages.map(msg => (
+          <MailItem
+            key={msg.uid}
+            msg={msg}
+            selected={selectedUid === msg.uid}
+            onClick={() => selectMessage(msg.uid)}
+            onStar={(e) => {
+              e.stopPropagation();
+              starMutation.mutate({ uid: msg.uid, add: !msg.flagged });
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-function MessageRow({ msg, selected, onClick }: { msg: MailHeader; selected: boolean; onClick: () => void }) {
+function MailItem({
+  msg, selected, onClick, onStar,
+}: {
+  msg: MailHeader;
+  selected: boolean;
+  onClick: () => void;
+  onStar: (e: React.MouseEvent) => void;
+}) {
+  const color = avatarColor(msg.from);
+  const initial = senderInitial(msg.from);
+  const name = senderName(msg.from);
+
   return (
     <div
       onClick={onClick}
-      className={`px-3 py-3 border-b border-gray-50 cursor-pointer transition-colors ${
-        selected ? "bg-blue-50" : msg.seen ? "hover:bg-gray-50" : "bg-white hover:bg-gray-50"
-      }`}
+      className={`mail-item relative group
+        ${selected ? "mail-item-selected bg-[#c2e7ff] hover:bg-[#b8dffc]" : ""}
+        ${!selected && msg.seen ? "mail-item-read hover:bg-gray-100" : ""}
+        ${!selected && !msg.seen ? "mail-item-unread hover:bg-gray-50" : ""}
+      `}
     >
-      <div className="flex items-center justify-between mb-0.5">
-        <span className={`text-sm truncate flex-1 ${msg.seen ? "text-gray-700" : "font-semibold text-gray-900"}`}>
-          {msg.from.replace(/<.*>/, "").trim() || msg.from}
-        </span>
-        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-          {msg.flagged && <Star size={12} className="text-yellow-400 fill-yellow-400" />}
-          {msg.hasAttachments && <Paperclip size={12} className="text-gray-400" />}
-          <span className="text-xs text-gray-400">
-            {formatDistanceToNow(new Date(msg.date), { addSuffix: false })}
+      {/* Unread indicator */}
+      {!msg.seen && !selected && (
+        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-600 rounded-full" />
+      )}
+
+      {/* Avatar */}
+      <div className={`avatar ${color} text-xs mr-3`}>{initial}</div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className={`truncate text-sm ${msg.seen ? "text-[#444746]" : "font-semibold text-[#202124]"}`}>
+            {name}
+          </span>
+          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+            <button
+              onClick={onStar}
+              className={`opacity-0 group-hover:opacity-100 ${msg.flagged ? "opacity-100" : ""} transition-opacity`}
+            >
+              <Star
+                size={14}
+                className={msg.flagged ? "text-amber-400 fill-amber-400" : "text-gray-400"}
+              />
+            </button>
+            <span className={`text-xs ${msg.seen ? "text-[#5f6368]" : "font-medium text-[#202124]"}`}>
+              {formatMailDate(msg.date)}
+            </span>
+          </div>
+        </div>
+
+        <div className={`text-xs truncate mb-0.5 ${msg.seen ? "text-[#5f6368]" : "font-medium text-[#202124]"}`}>
+          {msg.subject || "(no subject)"}
+        </div>
+
+        <div className="flex items-center gap-1">
+          {msg.hasAttachments && <Paperclip size={11} className="text-gray-400 flex-shrink-0" />}
+          <span className="text-xs text-[#5f6368] truncate">
+            {msg.preview ? stripHtml(msg.preview) : ""}
           </span>
         </div>
       </div>
-      <div className={`text-xs truncate mb-0.5 ${msg.seen ? "text-gray-600" : "font-medium text-gray-800"}`}>
-        {msg.subject || "(no subject)"}
-      </div>
-      {msg.preview && (
-        <div className="text-xs text-gray-400 truncate">{msg.preview}</div>
-      )}
     </div>
   );
 }

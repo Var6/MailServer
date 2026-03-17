@@ -1,14 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { @apply bg-gray-50 text-gray-900 text-sm; }
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { @apply bg-[#f6f8fc] text-[#202124] text-sm; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium
+           px-4 py-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-full
+           px-3 py-1.5 transition-colors;
+  }
+  .mail-item {
+    @apply flex items-center px-4 py-3 cursor-pointer border-b border-gray-100
+           transition-colors hover:shadow-sm;
+  }
+  .mail-item-unread {
+    @apply bg-white font-medium;
+  }
+  .mail-item-read {
+    @apply bg-[#f6f8fc];
+  }
+  .mail-item-selected {
+    @apply bg-blue-50 !important;
+  }
+  .folder-btn {
+    @apply flex items-center gap-3 w-full px-4 py-2 rounded-r-full text-sm transition-colors
+           text-[#444746] hover:bg-gray-100;
+  }
+  .folder-btn-active {
+    @apply bg-[#d3e3fd] text-[#001d35] font-semibold hover:bg-[#c5d9f9];
+  }
+  .avatar {
+    @apply w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold
+           flex-shrink-0 text-white select-none uppercase;
+  }
+  .badge {
+    @apply text-xs font-medium bg-gray-200 text-gray-700 rounded-full px-2 py-0.5 ml-auto;
+  }
+  .badge-unread {
+    @apply bg-blue-600 text-white;
+  }
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded;
+  }
 }
 
 @layer utilities {
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { @apply bg-gray-400; }
+  .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 }

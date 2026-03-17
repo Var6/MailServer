@@ -3,7 +3,6 @@ version: "3.9"
 # ============================================================
 #  MailServer — Core Mail Stack
 #  docker-compose.yml
-#  Run with: docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d
 # ============================================================
 
 networks:
@@ -16,34 +15,30 @@ volumes:
   redis_data:
   clamav_db:
   dkim_keys:
+  mongodb_data:
 
 services:
 
-  # ── MariaDB (Galera Cluster member) ──────────────────────
-  mariadb:
-    image: mariadb:11
-    container_name: mailserver-mariadb
+  # ── MongoDB (Replica Set member) ─────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: mailserver-mongodb
     restart: unless-stopped
-    env_file: .env
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongodb/keyfile
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: mailserver
     volumes:
-      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/db:/var/lib/mysql
-      - ./config/mariadb/my.cnf:/etc/mysql/conf.d/my.cnf:ro
-      - ./config/mariadb/galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
-      - ./config/mariadb/initdb:/docker-entrypoint-initdb.d:ro
+      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/mongodb:/data/db
+      - ./config/mongodb/keyfile:/etc/mongodb/keyfile:ro
+      - ./config/mongodb/initdb.js:/docker-entrypoint-initdb.d/initdb.js:ro
     ports:
-      - "3306:3306"
-      - "4567:4567"   # Galera replication
-      - "4568:4568"   # Galera IST
-      - "4444:4444"   # Galera SST
+      - "27017:27017"
     networks:
       - mailnet
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -81,16 +76,12 @@ services:
       - dkim_keys:/etc/opendkim/keys
       - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
-      - ./config/postfix/mysql-virtual-mailbox-domains.cf:/etc/postfix/mysql-virtual-mailbox-domains.cf:ro
-      - ./config/postfix/mysql-virtual-mailbox-maps.cf:/etc/postfix/mysql-virtual-mailbox-maps.cf:ro
-      - ./config/postfix/mysql-virtual-alias-maps.cf:/etc/postfix/mysql-virtual-alias-maps.cf:ro
-      - ./config/postfix/mysql-sender-login-maps.cf:/etc/postfix/mysql-sender-login-maps.cf:ro
     ports:
       - "25:25"
       - "587:587"
       - "465:465"
     depends_on:
-      mariadb:
+      mongodb:
         condition: service_healthy
       dovecot:
         condition: service_started
@@ -111,13 +102,12 @@ services:
       - ${GLUSTER_CERTS_PATH:-/gluster/certs}:/etc/ssl/mailserver:ro
       - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
       - ./config/dovecot/conf.d:/etc/dovecot/conf.d:ro
-      - ./config/dovecot/dovecot-sql.conf.ext:/etc/dovecot/dovecot-sql.conf.ext:ro
     ports:
       - "143:143"
       - "993:993"
       - "4190:4190"
     depends_on:
-      mariadb:
+      mongodb:
         condition: service_healthy
     networks:
       - mailnet
@@ -153,4 +143,4 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 120s   # DB download takes time on first start
+      start_period: 120s

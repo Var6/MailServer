@@ -1,9 +1,15 @@
-import { NavLink } from "react-router-dom";
-import { Mail, Calendar, Users, Folder, LogOut } from "lucide-react";
-import { useAuthStore } from "../../store/index.ts";
-import { useMailStore } from "../../store/index.ts";
+import { NavLink, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Mail, Calendar, Users, Folder, LogOut, Inbox, Send,
+  AlertTriangle, Trash2, Archive, FileText, ChevronDown, ChevronRight,
+  PenSquare
+} from "lucide-react";
+import { useAuthStore, useMailStore } from "../../store/index.ts";
 import { logout } from "../../api/authApi.ts";
-import FolderTree from "../Mail/FolderTree.tsx";
+import { getFolders } from "../../api/mailApi.ts";
+import { avatarColor } from "../../lib/utils.ts";
+import { useState } from "react";
 
 const NAV = [
   { to: "/inbox",    icon: Mail,      label: "Mail"     },
@@ -12,9 +18,28 @@ const NAV = [
   { to: "/files",    icon: Folder,    label: "Files"    },
 ];
 
+const SPECIAL_MAP: Record<string, { icon: typeof Inbox; label: string; order: number }> = {
+  "INBOX":   { icon: Inbox,        label: "Inbox",   order: 0 },
+  "Sent":    { icon: Send,         label: "Sent",    order: 1 },
+  "Drafts":  { icon: FileText,     label: "Drafts",  order: 2 },
+  "Junk":    { icon: AlertTriangle,label: "Spam",    order: 3 },
+  "Trash":   { icon: Trash2,       label: "Trash",   order: 4 },
+  "Archive": { icon: Archive,      label: "Archive", order: 5 },
+};
+
 export default function Sidebar() {
   const { email, clearAuth } = useAuthStore();
-  const openCompose = useMailStore(s => s.openCompose);
+  const { selectedFolder, setFolder, openCompose } = useMailStore();
+  const { pathname } = useLocation();
+  const isMailRoute = pathname.startsWith("/inbox");
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const { data: folders = [] } = useQuery({
+    queryKey: ["folders"],
+    queryFn: getFolders,
+    enabled: isMailRoute,
+    staleTime: 60_000,
+  });
 
   const handleLogout = async () => {
     await logout().catch(() => {});
@@ -23,56 +48,112 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
+  const initial = email?.[0]?.toUpperCase() ?? "?";
+  const color = avatarColor(email ?? "");
+
+  // Split folders into main (known special) + more
+  const mainFolders = folders
+    .filter(f => SPECIAL_MAP[f.name])
+    .sort((a, b) => (SPECIAL_MAP[a.name]?.order ?? 99) - (SPECIAL_MAP[b.name]?.order ?? 99));
+  const otherFolders = folders.filter(f => !SPECIAL_MAP[f.name]);
+
   return (
-    <div className="w-56 bg-white border-r border-gray-200 flex flex-col h-full">
+    <aside className="w-64 bg-white flex flex-col h-full border-r border-gray-100 select-none">
+
       {/* Logo */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <span className="font-bold text-blue-600 text-lg">MailServer</span>
+      <div className="px-5 py-4 flex items-center gap-2">
+        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <Mail size={16} className="text-white" />
+        </div>
+        <span className="font-semibold text-[#202124] text-base tracking-tight">MailServer</span>
       </div>
 
-      {/* Compose button */}
-      <div className="p-3">
+      {/* Compose */}
+      <div className="px-3 mb-2">
         <button
           onClick={() => openCompose()}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-2 px-4 text-sm font-medium transition-colors"
+          className="flex items-center gap-3 bg-[#c2e7ff] hover:bg-[#b0d8f5] active:bg-[#9ecbec]
+                     text-[#001d35] font-medium rounded-2xl px-5 py-3 w-full transition-colors shadow-sm"
         >
-          + Compose
+          <PenSquare size={18} />
+          Compose
         </button>
       </div>
 
-      {/* Nav links */}
-      <nav className="flex-1 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin pt-1">
         {NAV.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-2 text-sm rounded-r-full mr-3 transition-colors ${
-                isActive ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-100"
-              }`
+              `folder-btn ${isActive ? "folder-btn-active" : ""}`
             }
           >
             <Icon size={18} />
-            {label}
+            <span>{label}</span>
           </NavLink>
         ))}
 
-        {/* IMAP folder tree — shows only under /inbox */}
-        <div className="mt-2 pl-4 pr-2">
-          <FolderTree />
-        </div>
+        {/* Mail folders — only visible on mail route */}
+        {isMailRoute && (
+          <div className="mt-2 border-t border-gray-100 pt-2">
+            {mainFolders.map(f => {
+              const meta = SPECIAL_MAP[f.name];
+              const Icon = meta.icon;
+              const active = selectedFolder === f.path;
+              return (
+                <button
+                  key={f.path}
+                  onClick={() => setFolder(f.path)}
+                  className={`folder-btn ${active ? "folder-btn-active" : ""}`}
+                >
+                  <Icon size={18} />
+                  <span className="flex-1 text-left">{meta.label}</span>
+                </button>
+              );
+            })}
+
+            {otherFolders.length > 0 && (
+              <>
+                <button
+                  onClick={() => setMoreOpen(v => !v)}
+                  className="folder-btn text-gray-500"
+                >
+                  {moreOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  <span>More</span>
+                </button>
+                {moreOpen && otherFolders.map(f => (
+                  <button
+                    key={f.path}
+                    onClick={() => setFolder(f.path)}
+                    className={`folder-btn pl-8 ${selectedFolder === f.path ? "folder-btn-active" : ""}`}
+                  >
+                    <Folder size={16} />
+                    <span className="flex-1 text-left truncate">{f.name}</span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </nav>
 
-      {/* User info + logout */}
-      <div className="border-t border-gray-200 p-3 flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold uppercase">
-          {email?.[0] ?? "?"}
+      {/* User */}
+      <div className="border-t border-gray-100 px-3 py-3 flex items-center gap-2.5">
+        <div className={`avatar ${color} text-xs`}>{initial}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-[#202124] truncate">{email}</p>
+          <p className="text-xs text-gray-400">Signed in</p>
         </div>
-        <span className="text-xs text-gray-600 truncate flex-1">{email}</span>
-        <button onClick={handleLogout} className="text-gray-400 hover:text-red-500">
-          <LogOut size={16} />
+        <button
+          onClick={handleLogout}
+          title="Sign out"
+          className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+        >
+          <LogOut size={15} />
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

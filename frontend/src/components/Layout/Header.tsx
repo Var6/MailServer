@@ -1,25 +1,49 @@
-import { Search, Settings } from "lucide-react";
+import { Search, Settings, HelpCircle } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
+  const [focused, setFocused] = useState(false);
   const [query, setQuery] = useState("");
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3">
-      <div className="flex-1 max-w-xl">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+    <header className="bg-[#f6f8fc] px-4 py-2 flex items-center gap-3 flex-shrink-0">
+      {/* Search */}
+      <div className={`flex-1 max-w-2xl transition-all ${focused ? "max-w-3xl" : ""}`}>
+        <div className={`relative flex items-center bg-[#eaf1fb] hover:bg-[#dde9f9] rounded-2xl transition-all
+                         ${focused ? "bg-white shadow-md hover:bg-white ring-1 ring-blue-200" : ""}`}>
+          <Search
+            size={18}
+            className="absolute left-4 text-gray-500 pointer-events-none"
+          />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search mail..."
-            className="w-full pl-9 pr-3 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="Search mail"
+            className="w-full pl-11 pr-4 py-2.5 bg-transparent text-sm text-[#202124]
+                       placeholder-[#5f6368] focus:outline-none rounded-2xl"
           />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-3 text-gray-400 hover:text-gray-600 text-xs px-1"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
-      <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-        <Settings size={18} />
-      </button>
+
+      {/* Right actions */}
+      <div className="flex items-center gap-1">
+        <button className="p-2 hover:bg-gray-200 rounded-full text-gray-600 transition-colors" title="Help">
+          <HelpCircle size={20} />
+        </button>
+        <button className="p-2 hover:bg-gray-200 rounded-full text-gray-600 transition-colors" title="Settings">
+          <Settings size={20} />
+        </button>
+      </div>
     </header>
   );
 }
