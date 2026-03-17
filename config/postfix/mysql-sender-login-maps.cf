@@ -1,0 +1,5 @@
+user     = mailserver
+password = MYSQL_PASSWORD_PLACEHOLDER
+hosts    = mariadb
+dbname   = mailserver
+query    = SELECT email FROM virtual_users WHERE email='%s'

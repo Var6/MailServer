@@ -1,0 +1,156 @@
+version: "3.9"
+
+# ============================================================
+#  MailServer — Core Mail Stack
+#  docker-compose.yml
+#  Run with: docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d
+# ============================================================
+
+networks:
+  mailnet:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
+
+volumes:
+  redis_data:
+  clamav_db:
+  dkim_keys:
+
+services:
+
+  # ── MariaDB (Galera Cluster member) ──────────────────────
+  mariadb:
+    image: mariadb:11
+    container_name: mailserver-mariadb
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/db:/var/lib/mysql
+      - ./config/mariadb/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - ./config/mariadb/galera.cnf:/etc/mysql/conf.d/galera.cnf:ro
+      - ./config/mariadb/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+      - "4567:4567"   # Galera replication
+      - "4568:4568"   # Galera IST
+      - "4444:4444"   # Galera SST
+    networks:
+      - mailnet
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis (Rspamd + Session cache) ───────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mailserver-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - mailnet
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Postfix (SMTP) ────────────────────────────────────────
+  postfix:
+    build:
+      context: ./docker/postfix
+      dockerfile: Dockerfile
+    image: mailserver-postfix:local
+    container_name: mailserver-postfix
+    restart: unless-stopped
+    env_file: .env
+    hostname: ${MAIL_HOSTNAME}
+    volumes:
+      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/vhosts:/var/mail/vhosts
+      - ${GLUSTER_CERTS_PATH:-/gluster/certs}:/etc/ssl/mailserver:ro
+      - dkim_keys:/etc/opendkim/keys
+      - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
+      - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
+      - ./config/postfix/mysql-virtual-mailbox-domains.cf:/etc/postfix/mysql-virtual-mailbox-domains.cf:ro
+      - ./config/postfix/mysql-virtual-mailbox-maps.cf:/etc/postfix/mysql-virtual-mailbox-maps.cf:ro
+      - ./config/postfix/mysql-virtual-alias-maps.cf:/etc/postfix/mysql-virtual-alias-maps.cf:ro
+      - ./config/postfix/mysql-sender-login-maps.cf:/etc/postfix/mysql-sender-login-maps.cf:ro
+    ports:
+      - "25:25"
+      - "587:587"
+      - "465:465"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      dovecot:
+        condition: service_started
+    networks:
+      - mailnet
+
+  # ── Dovecot (IMAP / POP3 / LMTP / SASL) ─────────────────
+  dovecot:
+    build:
+      context: ./docker/dovecot
+      dockerfile: Dockerfile
+    image: mailserver-dovecot:local
+    container_name: mailserver-dovecot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/vhosts:/var/mail/vhosts
+      - ${GLUSTER_CERTS_PATH:-/gluster/certs}:/etc/ssl/mailserver:ro
+      - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
+      - ./config/dovecot/conf.d:/etc/dovecot/conf.d:ro
+      - ./config/dovecot/dovecot-sql.conf.ext:/etc/dovecot/dovecot-sql.conf.ext:ro
+    ports:
+      - "143:143"
+      - "993:993"
+      - "4190:4190"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - mailnet
+
+  # ── Rspamd (Spam filter + DKIM) ───────────────────────────
+  rspamd:
+    image: rspamd/rspamd:latest
+    container_name: mailserver-rspamd
+    restart: unless-stopped
+    volumes:
+      - ./config/rspamd/local.d:/etc/rspamd/local.d:ro
+      - ./config/rspamd/override.d:/etc/rspamd/override.d:ro
+      - dkim_keys:/var/lib/rspamd/dkim:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - mailnet
+
+  # ── ClamAV (Antivirus) ────────────────────────────────────
+  clamav:
+    image: clamav/clamav:latest
+    container_name: mailserver-clamav
+    restart: unless-stopped
+    volumes:
+      - clamav_db:/var/lib/clamav
+      - ./config/clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+      - ./config/clamav/freshclam.conf:/etc/clamav/freshclam.conf:ro
+    networks:
+      - mailnet
+    healthcheck:
+      test: ["CMD", "clamdscan", "--version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s   # DB download takes time on first start

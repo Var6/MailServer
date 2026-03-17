@@ -1,0 +1,5 @@
+user     = mailserver
+password = MYSQL_PASSWORD_PLACEHOLDER
+hosts    = mariadb
+dbname   = mailserver
+query    = SELECT destination FROM virtual_aliases WHERE source='%s'

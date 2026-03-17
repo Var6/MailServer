@@ -1,0 +1,15 @@
+.env
+*.pem
+*.key
+*.crt
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+/config/nginx/ssl/
+/gluster/
+/data/
+*.tmp
+backend/.env
+frontend/.env

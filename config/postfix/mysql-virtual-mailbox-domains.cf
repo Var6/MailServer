@@ -1,0 +1,5 @@
+user     = mailserver
+password = MYSQL_PASSWORD_PLACEHOLDER
+hosts    = mariadb
+dbname   = mailserver
+query    = SELECT 1 FROM virtual_domains WHERE name='%s'

@@ -1,0 +1,30 @@
+# ============================================================
+#  MariaDB Galera Cluster Configuration
+#  This file is the same on both Pis; values that differ are
+#  set via environment variables and an entrypoint script.
+# ============================================================
+
+[mysqld]
+# Galera provider
+wsrep_on                  = ON
+wsrep_provider            = /usr/lib/galera/libgalera_smm.so
+
+# Cluster identity
+wsrep_cluster_name        = "MailCluster"
+# Set in setup script: gcomm://PI_PRIMARY_IP,PI_SECONDARY_IP
+# On first bootstrap of primary: gcomm://
+wsrep_cluster_address     = GALERA_CLUSTER_ADDRESS_PLACEHOLDER
+
+# Node identity — set per host via entrypoint script
+wsrep_node_name           = GALERA_NODE_NAME_PLACEHOLDER
+wsrep_node_address        = GALERA_NODE_ADDRESS_PLACEHOLDER
+
+# SST method (mariabackup is safe for hot-copy)
+wsrep_sst_method          = mariabackup
+wsrep_sst_auth            = root:MYSQL_ROOT_PASSWORD_PLACEHOLDER
+
+# Required for Galera
+binlog_format             = ROW
+default_storage_engine    = InnoDB
+innodb_autoinc_lock_mode  = 2
+innodb_doublewrite        = 1
