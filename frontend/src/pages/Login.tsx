@@ -6,15 +6,21 @@ import { login } from "../api/authApi.ts";
 export default function LoginPage() {
   const nav = useNavigate();
   const { accessToken, setAuth } = useAuthStore();
+  // role redirect handled in useEffect above
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [step, setStep]         = useState<"email" | "password">("email");
 
+  const role = useAuthStore(s => s.role);
+
   useEffect(() => {
-    if (accessToken) nav("/inbox");
-  }, [accessToken, nav]);
+    if (!accessToken) return;
+    if (role === "superadmin") nav("/superadmin/tenants", { replace: true });
+    else if (role === "admin") nav("/admin/users", { replace: true });
+    else nav("/inbox", { replace: true });
+  }, [accessToken, role, nav]);
 
   const handleEmailNext = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +35,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { accessToken, user } = await login(email, password);
-      setAuth(accessToken, user.email);
+      setAuth(accessToken, { email: user.email, role: user.role, domain: user.domain, displayName: user.displayName });
       sessionStorage.setItem("mp", password);
-      nav("/inbox");
+      // nav handled by useEffect role redirect
     } catch {
       setError("Wrong password. Try again.");
       setLoading(false);

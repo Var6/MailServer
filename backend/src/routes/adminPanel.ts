@@ -33,7 +33,9 @@ router.get("/users", async (req, res, next) => {
 
 // POST /admin/users — Create user in own domain
 const createSchema = z.object({
-  email:       z.string().email(),
+  // Accept either localPart ("john") or full email ("john@example.com")
+  localPart:   z.string().regex(/^[a-zA-Z0-9._+%-]+$/).optional(),
+  email:       z.string().email().optional(),
   password:    z.string().min(8),
   displayName: z.string().optional(),
   quotaMb:     z.coerce.number().int().min(100).optional(),
@@ -43,9 +45,10 @@ router.post("/users", async (req, res, next) => {
   try {
     const data = createSchema.parse(req.body);
 
-    // Force email to be in admin's domain — ignore whatever domain the client sent
-    const localPart = data.email.split("@")[0];
-    const enforcedEmail = `${localPart}@${req.user!.domain}`;
+    // Extract local part from either field; domain is always enforced from JWT
+    const rawLocal = data.localPart ?? data.email?.split("@")[0];
+    if (!rawLocal) { res.status(400).json({ error: "localPart or email required" }); return; }
+    const enforcedEmail = `${rawLocal.toLowerCase()}@${req.user!.domain}`;
 
     const user = await createUser({
       email: enforcedEmail,

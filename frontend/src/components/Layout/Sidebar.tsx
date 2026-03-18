@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Mail, Calendar, Users, Folder, LogOut, Inbox, Send,
   AlertTriangle, Trash2, Archive, FileText, ChevronDown, ChevronRight,
-  PenSquare
+  PenSquare, Building2, UserCog
 } from "lucide-react";
 import { useAuthStore, useMailStore } from "../../store/index.ts";
 import { logout } from "../../api/authApi.ts";
@@ -11,11 +11,22 @@ import { getFolders } from "../../api/mailApi.ts";
 import { avatarColor } from "../../lib/utils.ts";
 import { useState } from "react";
 
-const NAV = [
+const USER_NAV = [
   { to: "/inbox",    icon: Mail,      label: "Mail"     },
   { to: "/calendar", icon: Calendar,  label: "Calendar" },
   { to: "/contacts", icon: Users,     label: "Contacts" },
   { to: "/files",    icon: Folder,    label: "Files"    },
+];
+
+const ADMIN_NAV = [
+  { to: "/admin/users", icon: UserCog, label: "Users"    },
+  { to: "/inbox",       icon: Mail,    label: "Mail"     },
+  { to: "/calendar",    icon: Calendar,label: "Calendar" },
+  { to: "/files",       icon: Folder,  label: "Files"    },
+];
+
+const SUPERADMIN_NAV = [
+  { to: "/superadmin/tenants", icon: Building2, label: "Tenants" },
 ];
 
 const SPECIAL_MAP: Record<string, { icon: typeof Inbox; label: string; order: number }> = {
@@ -28,7 +39,7 @@ const SPECIAL_MAP: Record<string, { icon: typeof Inbox; label: string; order: nu
 };
 
 export default function Sidebar() {
-  const { email, clearAuth } = useAuthStore();
+  const { email, displayName, role, clearAuth } = useAuthStore();
   const { selectedFolder, setFolder, openCompose } = useMailStore();
   const { pathname } = useLocation();
   const isMailRoute = pathname.startsWith("/inbox");
@@ -48,10 +59,13 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  const initial = email?.[0]?.toUpperCase() ?? "?";
-  const color = avatarColor(email ?? "");
+  const initial  = (displayName || email)?.[0]?.toUpperCase() ?? "?";
+  const color    = avatarColor(email ?? "");
 
-  // Split folders into main (known special) + more
+  const navItems = role === "superadmin" ? SUPERADMIN_NAV
+                 : role === "admin"      ? ADMIN_NAV
+                 : USER_NAV;
+
   const mainFolders = folders
     .filter(f => SPECIAL_MAP[f.name])
     .sort((a, b) => (SPECIAL_MAP[a.name]?.order ?? 99) - (SPECIAL_MAP[b.name]?.order ?? 99));
@@ -68,21 +82,23 @@ export default function Sidebar() {
         <span className="font-semibold text-[#202124] text-base tracking-tight">MailServer</span>
       </div>
 
-      {/* Compose */}
-      <div className="px-3 mb-2">
-        <button
-          onClick={() => openCompose()}
-          className="flex items-center gap-3 bg-[#c2e7ff] hover:bg-[#b0d8f5] active:bg-[#9ecbec]
-                     text-[#001d35] font-medium rounded-2xl px-5 py-3 w-full transition-colors shadow-sm"
-        >
-          <PenSquare size={18} />
-          Compose
-        </button>
-      </div>
+      {/* Compose — only for mail users */}
+      {role !== "superadmin" && (
+        <div className="px-3 mb-2">
+          <button
+            onClick={() => openCompose()}
+            className="flex items-center gap-3 bg-[#c2e7ff] hover:bg-[#b0d8f5] active:bg-[#9ecbec]
+                       text-[#001d35] font-medium rounded-2xl px-5 py-3 w-full transition-colors shadow-sm"
+          >
+            <PenSquare size={18} />
+            Compose
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin pt-1">
-        {NAV.map(({ to, icon: Icon, label }) => (
+        {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -139,12 +155,23 @@ export default function Sidebar() {
         )}
       </nav>
 
+      {/* Role badge */}
+      {role && role !== "user" && (
+        <div className="px-4 py-1">
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+            role === "superadmin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+          }`}>
+            {role === "superadmin" ? "Super Admin" : "Admin"}
+          </span>
+        </div>
+      )}
+
       {/* User */}
       <div className="border-t border-gray-100 px-3 py-3 flex items-center gap-2.5">
         <div className={`avatar ${color} text-xs`}>{initial}</div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-[#202124] truncate">{email}</p>
-          <p className="text-xs text-gray-400">Signed in</p>
+          <p className="text-xs font-medium text-[#202124] truncate">{displayName || email}</p>
+          <p className="text-xs text-gray-400 truncate">{displayName ? email : "Signed in"}</p>
         </div>
         <button
           onClick={handleLogout}

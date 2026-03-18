@@ -1,15 +1,30 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuthStore } from "./store/index.ts";
-import LoginPage    from "./pages/Login.tsx";
-import InboxPage    from "./pages/Inbox.tsx";
-import CalendarPage from "./pages/Calendar.tsx";
-import ContactsPage from "./pages/Contacts.tsx";
-import FilesPage    from "./pages/Files.tsx";
-import Layout       from "./components/Layout/Layout.tsx";
+import { useAuthStore, type UserRole } from "./store/index.ts";
+import LoginPage      from "./pages/Login.tsx";
+import InboxPage      from "./pages/Inbox.tsx";
+import CalendarPage   from "./pages/Calendar.tsx";
+import ContactsPage   from "./pages/Contacts.tsx";
+import FilesPage      from "./pages/Files.tsx";
+import TenantsPage    from "./pages/superadmin/Tenants.tsx";
+import AdminUsersPage from "./pages/admin/Users.tsx";
+import Layout         from "./components/Layout/Layout.tsx";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = useAuthStore(s => s.accessToken);
   return token ? children : <Navigate to="/login" replace />;
+}
+
+function RequireRole({ roles, children }: { roles: UserRole[]; children: JSX.Element }) {
+  const role = useAuthStore(s => s.role);
+  if (!role || !roles.includes(role)) return <Navigate to="/inbox" replace />;
+  return children;
+}
+
+function RoleHome() {
+  const role = useAuthStore(s => s.role);
+  if (role === "superadmin") return <Navigate to="/superadmin/tenants" replace />;
+  if (role === "admin")      return <Navigate to="/admin/users" replace />;
+  return <Navigate to="/inbox" replace />;
 }
 
 export default function App() {
@@ -25,11 +40,27 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<Navigate to="/inbox" replace />} />
+          <Route index element={<RoleHome />} />
+
+          {/* Regular user routes */}
           <Route path="inbox"    element={<InboxPage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="contacts" element={<ContactsPage />} />
           <Route path="files"    element={<FilesPage />} />
+
+          {/* Admin routes */}
+          <Route path="admin/users" element={
+            <RequireRole roles={["admin", "superadmin"]}>
+              <AdminUsersPage />
+            </RequireRole>
+          } />
+
+          {/* Super-admin routes */}
+          <Route path="superadmin/tenants" element={
+            <RequireRole roles={["superadmin"]}>
+              <TenantsPage />
+            </RequireRole>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>
