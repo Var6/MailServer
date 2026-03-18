@@ -76,10 +76,14 @@ services:
       - dkim_keys:/etc/opendkim/keys
       - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
+      - ./config/postfix/virtual_mailbox_pcre:/etc/postfix/virtual_mailbox_pcre:ro
+      - ./config/postfix/sender_login_pcre:/etc/postfix/sender_login_pcre:ro
     ports:
       - "25:25"
       - "587:587"
       - "465:465"
+    environment:
+      API_URL: "http://api:3000"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -105,6 +109,8 @@ services:
     ports:
       - "143:143"
       - "993:993"
+      - "110:110"
+      - "995:995"
       - "4190:4190"
     depends_on:
       mongodb:

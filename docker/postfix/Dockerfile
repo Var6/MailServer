@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       postfix \
-      postfix-mysql \
+      postfix-pcre \
       libsasl2-modules \
       libsasl2-modules-db \
       sasl2-bin \
@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       opendkim-tools \
       gettext-base \
       ca-certificates \
+      curl \
+      python3 \
       telnet \
       netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*

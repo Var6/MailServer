@@ -15,9 +15,10 @@ local_transport = error:local mail delivery is disabled
 local_recipient_maps =
 
 # --- Virtual Mailbox ---
-virtual_mailbox_domains   = mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf
-virtual_mailbox_maps      = mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf
-virtual_alias_maps        = mysql:/etc/postfix/mysql-virtual-alias-maps.cf
+# Domains are written at container startup by entrypoint.sh querying the API.
+# Users are validated by Dovecot LMTP (returns 5xx for unknown users).
+virtual_mailbox_domains   = hash:/etc/postfix/virtual_domains
+virtual_mailbox_maps      = pcre:/etc/postfix/virtual_mailbox_pcre
 virtual_transport         = lmtp:unix:private/dovecot-lmtp
 virtual_mailbox_base      = /var/mail/vhosts
 
@@ -72,7 +73,8 @@ smtpd_relay_restrictions  =
     reject_unauth_destination
 
 # --- Sender login map (prevent spoofing) ---
-smtpd_sender_login_maps   = mysql:/etc/postfix/mysql-sender-login-maps.cf
+# Authenticated users may only send from their own address.
+smtpd_sender_login_maps   = pcre:/etc/postfix/sender_login_pcre
 
 # --- Milters (Rspamd) ---
 smtpd_milters             = inet:rspamd:11332

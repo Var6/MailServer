@@ -1,0 +1,3 @@
+# Authenticated users may only send from their own address.
+# SASL login name == full email address; sender address must match.
+/^(.+)$/    $1
