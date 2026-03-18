@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Building2, Users, HardDrive, ToggleLeft, ToggleRight } from "lucide-react";
@@ -23,7 +24,7 @@ export default function EditTenantModal({ tenant, onClose }: Props) {
       addToast("Tenant updated", "success");
       onClose();
     },
-    onError: (e: Error) => addToast(e.message || "Update failed", "error"),
+    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Update failed"), "error"),
   });
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) =>

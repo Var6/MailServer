@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Building2, Globe, Mail, Lock, Users, HardDrive } from "lucide-react";
+import { X, Building2, Globe, Mail, Lock, Users, HardDrive, Info } from "lucide-react";
 import { createTenant } from "../../api/superadminApi.ts";
 import { useToastStore } from "../../store/index.ts";
+import axios from "axios";
 
 interface Props { onClose: () => void; }
 
@@ -14,6 +15,11 @@ export default function CreateTenantModal({ onClose }: Props) {
     adminDisplayName: "", maxUsers: 10, storagePerUserMb: 512,
   });
 
+  // derive whether admin email matches domain
+  const emailMatchesDomain = form.domain && form.adminEmail
+    ? form.adminEmail.endsWith(`@${form.domain}`)
+    : true;
+
   const mutation = useMutation({
     mutationFn: createTenant,
     onSuccess: () => {
@@ -21,20 +27,34 @@ export default function CreateTenantModal({ onClose }: Props) {
       addToast("Tenant created successfully", "success");
       onClose();
     },
-    onError: (e: Error) => addToast(e.message || "Failed to create tenant", "error"),
+    onError: (e: unknown) => {
+      // Extract the actual server error message if available
+      const msg = axios.isAxiosError(e)
+        ? e.response?.data?.error ?? e.message
+        : (e instanceof Error ? e.message : "Failed to create tenant");
+      addToast(msg, "error");
+    },
   });
 
   const set = (k: keyof typeof form, v: string | number) =>
     setForm(f => ({ ...f, [k]: v }));
 
-  const handleDomainBlur = () => {
-    if (form.domain && !form.adminEmail) {
-      set("adminEmail", `admin@${form.domain}`);
-    }
+  // Auto-fill adminEmail whenever domain changes
+  const handleDomainChange = (val: string) => {
+    const d = val.toLowerCase();
+    setForm(f => ({
+      ...f,
+      domain: d,
+      // only auto-fill if user hasn't customised it yet (or it still matches old domain)
+      adminEmail: !f.adminEmail || f.adminEmail === `admin@${f.domain}`
+        ? (d ? `admin@${d}` : "")
+        : f.adminEmail,
+    }));
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!emailMatchesDomain) return;
     mutation.mutate(form);
   };
 
@@ -73,14 +93,14 @@ export default function CreateTenantModal({ onClose }: Props) {
             <Field icon={<Globe size={14} />} label="Domain" required>
               <input
                 value={form.domain}
-                onChange={e => set("domain", e.target.value.toLowerCase())}
-                onBlur={handleDomainBlur}
+                onChange={e => handleDomainChange(e.target.value)}
                 placeholder="acme.com"
                 required
-                pattern="^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?(\.[a-z]{2,})+$"
-                title="Enter a valid domain (e.g. acme.com)"
                 className="field-input"
               />
+              <p className="text-xs text-[#5f6368] mt-0.5">
+                Use any domain — real or made-up (e.g. <code>acme.local</code>)
+              </p>
             </Field>
           </div>
 
@@ -89,15 +109,30 @@ export default function CreateTenantModal({ onClose }: Props) {
           {/* Admin account */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-[#5f6368] uppercase tracking-wider">Admin Account</p>
+
+            {/* Login hint */}
+            <div className="flex items-start gap-2 bg-blue-50 rounded-xl px-3 py-2.5">
+              <Info size={13} className="text-blue-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-blue-700">
+                The admin logs in at <strong>this same URL</strong> using this email + password.
+                They'll land on the Users page to manage their company.
+              </p>
+            </div>
+
             <Field icon={<Mail size={14} />} label="Admin Email" required>
               <input
                 value={form.adminEmail}
                 onChange={e => set("adminEmail", e.target.value.toLowerCase())}
-                placeholder={`admin@${form.domain || "company.com"}`}
+                placeholder={`admin@${form.domain || "acme.com"}`}
                 required
                 type="email"
-                className="field-input"
+                className={`field-input ${!emailMatchesDomain ? "border-red-400 ring-1 ring-red-300" : ""}`}
               />
+              {!emailMatchesDomain && (
+                <p className="text-xs text-red-500 mt-0.5">
+                  Must end with <code>@{form.domain}</code>
+                </p>
+              )}
             </Field>
             <Field icon={<Users size={14} />} label="Display Name">
               <input
@@ -156,7 +191,7 @@ export default function CreateTenantModal({ onClose }: Props) {
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
             <button
               type="submit"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !emailMatchesDomain}
               className="btn-primary"
             >
               {mutation.isPending ? "Creating…" : "Create Tenant"}

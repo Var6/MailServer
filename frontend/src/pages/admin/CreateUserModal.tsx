@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Mail, Lock, Users, HardDrive, User } from "lucide-react";
@@ -22,7 +23,7 @@ export default function CreateUserModal({ onClose }: Props) {
       addToast("User created successfully", "success");
       onClose();
     },
-    onError: (e: Error) => addToast(e.message || "Failed to create user", "error"),
+    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Failed to create user"), "error"),
   });
 
   const set = (k: keyof typeof form, v: string | number) =>

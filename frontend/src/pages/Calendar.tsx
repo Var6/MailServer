@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
@@ -99,7 +100,7 @@ function TeamCalendar() {
       setSelected(null);
       addToast("Event removed", "info");
     },
-    onError: (e: Error) => addToast(e.message || "Failed to delete event", "error"),
+    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Failed to delete event"), "error"),
   });
 
   const fcEvents = events.map(e => ({
@@ -188,7 +189,7 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
       addToast("Event added to team calendar", "success");
       onClose();
     },
-    onError: (e: Error) => addToast(e.message || "Failed to create event", "error"),
+    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Failed to create event"), "error"),
   });
 
   const set = (k: keyof typeof form, v: string | boolean) =>

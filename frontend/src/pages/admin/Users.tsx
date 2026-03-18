@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -39,7 +40,7 @@ export default function AdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
       addToast(`User ${email} deactivated`, "info");
     },
-    onError: (e: Error) => addToast(e.message || "Failed to deactivate user", "error"),
+    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Failed to deactivate user"), "error"),
   });
 
   const filtered = users
