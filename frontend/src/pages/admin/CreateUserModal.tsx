@@ -40,8 +40,8 @@ export default function CreateUserModal({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-full overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
@@ -57,7 +57,7 @@ export default function CreateUserModal({ onClose }: Props) {
           </button>
         </div>
 
-        <form onSubmit={submit} className="p-6 space-y-4">
+        <form onSubmit={submit} className="overflow-y-auto flex-1 p-6 space-y-4">
           {/* Email */}
           <div className="space-y-1">
             <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">

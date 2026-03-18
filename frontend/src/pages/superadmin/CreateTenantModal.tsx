@@ -34,8 +34,8 @@ export default function CreateTenantModal({ onClose }: Props) {
     setForm(f => ({ ...f, [k]: v }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-full overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
@@ -51,7 +51,7 @@ export default function CreateTenantModal({ onClose }: Props) {
           </button>
         </div>
 
-        <form onSubmit={e => { e.preventDefault(); mutation.mutate(form); }} className="p-6 space-y-4">
+        <form onSubmit={e => { e.preventDefault(); mutation.mutate(form); }} className="overflow-y-auto flex-1 p-6 space-y-4">
           {/* Company */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-[#5f6368] uppercase tracking-wider">Company</p>
