@@ -31,12 +31,6 @@ router.post("/", async (req, res, next) => {
     const existing = await Tenant.findOne({ domain: data.domain });
     if (existing) { res.status(409).json({ error: "Domain already registered" }); return; }
 
-    // Validate admin email is on the right domain
-    if (!data.adminEmail.endsWith(`@${data.domain}`)) {
-      res.status(400).json({ error: `Admin email must be @${data.domain}` });
-      return;
-    }
-
     // Create tenant
     const tenant = await Tenant.create({
       name: data.name,
@@ -54,13 +48,15 @@ router.post("/", async (req, res, next) => {
       { upsert: true }
     );
 
-    // Create admin user for this tenant
+    // Create admin user — tenantDomain ensures they belong to this tenant
+    // regardless of what email address they use to log in
     const adminUser = await createUser({
       email: data.adminEmail,
       password: data.adminPassword,
       role: "admin",
-      displayName: data.adminDisplayName ?? data.name + " Admin",
+      displayName: data.adminDisplayName || data.name + " Admin",
       quotaMb: data.storagePerUserMb,
+      tenantDomain: data.domain,
     });
 
     res.status(201).json({ tenant, adminEmail: adminUser.email });

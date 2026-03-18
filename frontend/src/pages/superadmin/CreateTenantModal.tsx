@@ -15,11 +15,6 @@ export default function CreateTenantModal({ onClose }: Props) {
     adminDisplayName: "", maxUsers: 10, storagePerUserMb: 512,
   });
 
-  // derive whether admin email matches domain
-  const emailMatchesDomain = form.domain && form.adminEmail
-    ? form.adminEmail.endsWith(`@${form.domain}`)
-    : true;
-
   const mutation = useMutation({
     mutationFn: createTenant,
     onSuccess: () => {
@@ -28,7 +23,6 @@ export default function CreateTenantModal({ onClose }: Props) {
       onClose();
     },
     onError: (e: unknown) => {
-      // Extract the actual server error message if available
       const msg = axios.isAxiosError(e)
         ? e.response?.data?.error ?? e.message
         : (e instanceof Error ? e.message : "Failed to create tenant");
@@ -39,29 +33,9 @@ export default function CreateTenantModal({ onClose }: Props) {
   const set = (k: keyof typeof form, v: string | number) =>
     setForm(f => ({ ...f, [k]: v }));
 
-  // Auto-fill adminEmail whenever domain changes
-  const handleDomainChange = (val: string) => {
-    const d = val.toLowerCase();
-    setForm(f => ({
-      ...f,
-      domain: d,
-      // only auto-fill if user hasn't customised it yet (or it still matches old domain)
-      adminEmail: !f.adminEmail || f.adminEmail === `admin@${f.domain}`
-        ? (d ? `admin@${d}` : "")
-        : f.adminEmail,
-    }));
-  };
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailMatchesDomain) return;
-    mutation.mutate(form);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
@@ -77,8 +51,8 @@ export default function CreateTenantModal({ onClose }: Props) {
           </button>
         </div>
 
-        <form onSubmit={submit} className="p-6 space-y-4">
-          {/* Company info */}
+        <form onSubmit={e => { e.preventDefault(); mutation.mutate(form); }} className="p-6 space-y-4">
+          {/* Company */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-[#5f6368] uppercase tracking-wider">Company</p>
             <Field icon={<Building2 size={14} />} label="Company Name" required>
@@ -90,16 +64,16 @@ export default function CreateTenantModal({ onClose }: Props) {
                 className="field-input"
               />
             </Field>
-            <Field icon={<Globe size={14} />} label="Domain" required>
+            <Field icon={<Globe size={14} />} label="Mail Domain" required>
               <input
                 value={form.domain}
-                onChange={e => handleDomainChange(e.target.value)}
+                onChange={e => set("domain", e.target.value.toLowerCase().replace(/\s/g, ""))}
                 placeholder="acme.com"
                 required
                 className="field-input"
               />
               <p className="text-xs text-[#5f6368] mt-0.5">
-                Use any domain — real or made-up (e.g. <code>acme.local</code>)
+                Emails for this company will end in <code>@{form.domain || "acme.com"}</code>
               </p>
             </Field>
           </div>
@@ -110,35 +84,29 @@ export default function CreateTenantModal({ onClose }: Props) {
           <div className="space-y-3">
             <p className="text-xs font-medium text-[#5f6368] uppercase tracking-wider">Admin Account</p>
 
-            {/* Login hint */}
             <div className="flex items-start gap-2 bg-blue-50 rounded-xl px-3 py-2.5">
               <Info size={13} className="text-blue-500 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-blue-700">
-                The admin logs in at <strong>this same URL</strong> using this email + password.
-                They'll land on the Users page to manage their company.
+                Admin logs in at <strong>this same URL</strong> using their email + password below.
+                The email can be anything — it doesn't have to match the company domain.
               </p>
             </div>
 
-            <Field icon={<Mail size={14} />} label="Admin Email" required>
+            <Field icon={<Mail size={14} />} label="Admin Login Email" required>
               <input
                 value={form.adminEmail}
                 onChange={e => set("adminEmail", e.target.value.toLowerCase())}
-                placeholder={`admin@${form.domain || "acme.com"}`}
+                placeholder="john@gmail.com or admin@acme.com"
                 required
                 type="email"
-                className={`field-input ${!emailMatchesDomain ? "border-red-400 ring-1 ring-red-300" : ""}`}
+                className="field-input"
               />
-              {!emailMatchesDomain && (
-                <p className="text-xs text-red-500 mt-0.5">
-                  Must end with <code>@{form.domain}</code>
-                </p>
-              )}
             </Field>
-            <Field icon={<Users size={14} />} label="Display Name">
+            <Field icon={<Users size={14} />} label="Admin Display Name">
               <input
                 value={form.adminDisplayName}
                 onChange={e => set("adminDisplayName", e.target.value)}
-                placeholder="Admin User"
+                placeholder="John Smith"
                 className="field-input"
               />
             </Field>
@@ -161,44 +129,83 @@ export default function CreateTenantModal({ onClose }: Props) {
           <div className="space-y-3">
             <p className="text-xs font-medium text-[#5f6368] uppercase tracking-wider">Limits</p>
             <div className="grid grid-cols-2 gap-3">
-              <Field icon={<Users size={14} />} label="Max Users" required>
-                <input
+              <Field icon={<Users size={14} />} label="Max User Accounts" required>
+                <Stepper
                   value={form.maxUsers}
-                  onChange={e => set("maxUsers", parseInt(e.target.value) || 1)}
-                  type="number" min={1} max={10000} required
-                  className="field-input"
+                  min={1} max={10000} step={5}
+                  onChange={v => set("maxUsers", v)}
                 />
               </Field>
-              <Field icon={<HardDrive size={14} />} label="Storage / User" required>
-                <div className="relative">
-                  <input
-                    value={form.storagePerUserMb}
-                    onChange={e => set("storagePerUserMb", parseInt(e.target.value) || 100)}
-                    type="number" min={100} max={102400} required
-                    className="field-input pr-10"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">MB</span>
-                </div>
+              <Field icon={<HardDrive size={14} />} label="Storage per Mailbox" required>
+                <StepperMb
+                  value={form.storagePerUserMb}
+                  onChange={v => set("storagePerUserMb", v)}
+                />
               </Field>
             </div>
             <p className="text-xs text-[#5f6368]">
-              Total: {((form.storagePerUserMb * form.maxUsers) / 1024).toFixed(1)} GB allocated
+              Total storage: <strong>{((form.storagePerUserMb * form.maxUsers) / 1024).toFixed(1)} GB</strong> allocated
             </p>
           </div>
 
-          {/* Actions */}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
-            <button
-              type="submit"
-              disabled={mutation.isPending || !emailMatchesDomain}
-              className="btn-primary"
-            >
+            <button type="submit" disabled={mutation.isPending} className="btn-primary">
               {mutation.isPending ? "Creating…" : "Create Tenant"}
             </button>
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ── Reusable stepper for user count ───────────────────────────────────────────
+function Stepper({ value, min, max, step, onChange }: {
+  value: number; min: number; max: number; step: number; onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+      <button type="button"
+        onClick={() => onChange(Math.max(min, value - step))}
+        className="px-3 py-2 text-gray-500 hover:bg-gray-100 font-medium text-sm select-none"
+      >−</button>
+      <input
+        type="number" value={value} min={min} max={max}
+        onChange={e => onChange(Math.min(max, Math.max(min, parseInt(e.target.value) || min)))}
+        className="flex-1 text-center text-sm py-2 outline-none w-0"
+      />
+      <button type="button"
+        onClick={() => onChange(Math.min(max, value + step))}
+        className="px-3 py-2 text-gray-500 hover:bg-gray-100 font-medium text-sm select-none"
+      >+</button>
+    </div>
+  );
+}
+
+// ── Stepper for storage with smart increments ─────────────────────────────────
+const MB_PRESETS = [256, 512, 1024, 2048, 5120, 10240, 20480, 51200, 102400];
+
+function StepperMb({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const idx = MB_PRESETS.indexOf(value);
+  const prev = idx > 0 ? MB_PRESETS[idx - 1] : null;
+  const next = idx < MB_PRESETS.length - 1 ? MB_PRESETS[idx + 1] : null;
+
+  const label = value >= 1024 ? `${(value / 1024).toFixed(value % 1024 === 0 ? 0 : 1)} GB` : `${value} MB`;
+
+  return (
+    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+      <button type="button"
+        onClick={() => prev !== null && onChange(prev)}
+        disabled={prev === null}
+        className="px-3 py-2 text-gray-500 hover:bg-gray-100 font-medium text-sm disabled:opacity-30 select-none"
+      >−</button>
+      <span className="flex-1 text-center text-sm py-2 font-medium">{label}</span>
+      <button type="button"
+        onClick={() => next !== null && onChange(next)}
+        disabled={next === null}
+        className="px-3 py-2 text-gray-500 hover:bg-gray-100 font-medium text-sm disabled:opacity-30 select-none"
+      >+</button>
     </div>
   );
 }

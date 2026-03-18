@@ -42,9 +42,12 @@ export async function createUser(opts: {
   quotaMb?: number;
   displayName?: string;
   createdByDomain?: string;
+  /** Explicit tenant domain — lets admin use any login email while still belonging to the right tenant */
+  tenantDomain?: string;
 }): Promise<IUser> {
   const { email, password, role = "user", displayName, createdByDomain } = opts;
-  const domain = email.split("@")[1].toLowerCase();
+  // Use explicit tenantDomain if provided, otherwise derive from email
+  const domain = (opts.tenantDomain ?? email.split("@")[1]).toLowerCase();
 
   // Admins can only create users in their own domain
   if (createdByDomain && domain !== createdByDomain) {
@@ -79,7 +82,7 @@ export async function createUser(opts: {
   const hash = await argon2.hash(password, { type: argon2.argon2id });
   return User.findOneAndUpdate(
     { email: email.toLowerCase() },
-    { email: email.toLowerCase(), password: hash, domain, role, quotaMb, displayName, active: true },
+    { email: email.toLowerCase(), password: hash, domain, role, quotaMb, displayName: displayName || undefined, active: true },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   ) as Promise<IUser>;
 }

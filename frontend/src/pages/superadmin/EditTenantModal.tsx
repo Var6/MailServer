@@ -7,13 +7,23 @@ import { useToastStore } from "../../store/index.ts";
 
 interface Props { tenant: Tenant; onClose: () => void; }
 
+const MB_PRESETS = [256, 512, 1024, 2048, 5120, 10240, 20480, 51200, 102400];
+
+function nearestPreset(v: number) {
+  return MB_PRESETS.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a);
+}
+
+function mbLabel(mb: number) {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB` : `${mb} MB`;
+}
+
 export default function EditTenantModal({ tenant, onClose }: Props) {
   const qc = useQueryClient();
   const { addToast } = useToastStore();
   const [form, setForm] = useState({
     name: tenant.name,
     maxUsers: tenant.maxUsers,
-    storagePerUserMb: tenant.storagePerUserMb,
+    storagePerUserMb: nearestPreset(tenant.storagePerUserMb),
     active: tenant.active,
   });
 
@@ -24,16 +34,18 @@ export default function EditTenantModal({ tenant, onClose }: Props) {
       addToast("Tenant updated", "success");
       onClose();
     },
-    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Update failed"), "error"),
+    onError: (e: unknown) => addToast(
+      axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Update failed"),
+      "error"
+    ),
   });
 
-  const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) =>
-    setForm(f => ({ ...f, [k]: v }));
+  const mbIdx = MB_PRESETS.indexOf(form.storagePerUserMb);
+  const tooFewUsers = form.maxUsers < (tenant.currentUsers || 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
@@ -57,47 +69,62 @@ export default function EditTenantModal({ tenant, onClose }: Props) {
             </label>
             <input
               value={form.name}
-              onChange={e => set("name", e.target.value)}
-              required
-              className="field-input"
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              required className="field-input"
             />
           </div>
 
-          {/* Limits */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">
-                <Users size={13} /> Max Users
-              </label>
-              <input
-                value={form.maxUsers}
-                onChange={e => set("maxUsers", parseInt(e.target.value) || 1)}
-                type="number" min={tenant.currentUsers || 1} max={10000}
-                className="field-input"
-              />
+          {/* User slots stepper */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">
+              <Users size={13} /> Max User Accounts
+            </label>
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              <button type="button"
+                onClick={() => setForm(f => ({ ...f, maxUsers: Math.max(tenant.currentUsers || 1, f.maxUsers - 5) }))}
+                className="px-4 py-2.5 text-gray-500 hover:bg-gray-100 font-medium text-lg select-none leading-none"
+              >−</button>
+              <div className="flex-1 text-center">
+                <p className="text-lg font-semibold text-[#202124]">{form.maxUsers}</p>
+                <p className="text-xs text-[#5f6368]">accounts</p>
+              </div>
+              <button type="button"
+                onClick={() => setForm(f => ({ ...f, maxUsers: Math.min(10000, f.maxUsers + 5) }))}
+                className="px-4 py-2.5 text-gray-500 hover:bg-gray-100 font-medium text-lg select-none leading-none"
+              >+</button>
             </div>
-            <div className="space-y-1">
-              <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">
-                <HardDrive size={13} /> Storage / User (MB)
-              </label>
-              <input
-                value={form.storagePerUserMb}
-                onChange={e => set("storagePerUserMb", parseInt(e.target.value) || 100)}
-                type="number" min={100} max={102400}
-                className="field-input"
-              />
+            {tooFewUsers && (
+              <p className="text-xs text-red-500">Cannot go below current user count ({tenant.currentUsers})</p>
+            )}
+          </div>
+
+          {/* Storage per mailbox stepper */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">
+              <HardDrive size={13} /> Storage per Mailbox
+            </label>
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              <button type="button"
+                onClick={() => mbIdx > 0 && setForm(f => ({ ...f, storagePerUserMb: MB_PRESETS[mbIdx - 1] }))}
+                disabled={mbIdx <= 0}
+                className="px-4 py-2.5 text-gray-500 hover:bg-gray-100 font-medium text-lg disabled:opacity-30 select-none leading-none"
+              >−</button>
+              <div className="flex-1 text-center">
+                <p className="text-lg font-semibold text-[#202124]">{mbLabel(form.storagePerUserMb)}</p>
+                <p className="text-xs text-[#5f6368]">per user</p>
+              </div>
+              <button type="button"
+                onClick={() => mbIdx < MB_PRESETS.length - 1 && setForm(f => ({ ...f, storagePerUserMb: MB_PRESETS[mbIdx + 1] }))}
+                disabled={mbIdx >= MB_PRESETS.length - 1}
+                className="px-4 py-2.5 text-gray-500 hover:bg-gray-100 font-medium text-lg disabled:opacity-30 select-none leading-none"
+              >+</button>
             </div>
           </div>
 
-          {/* Current usage info */}
-          <div className="bg-gray-50 rounded-xl p-3 text-xs text-[#5f6368] space-y-1">
-            <p>Current users: <span className="font-medium text-[#202124]">{tenant.currentUsers} / {form.maxUsers}</span></p>
-            <p>Total allocation: <span className="font-medium text-[#202124]">
-              {((form.storagePerUserMb * form.maxUsers) / 1024).toFixed(1)} GB
-            </span></p>
-            {form.maxUsers < tenant.currentUsers && (
-              <p className="text-red-500 font-medium">⚠ Max users cannot be less than current user count ({tenant.currentUsers})</p>
-            )}
+          {/* Usage summary */}
+          <div className="bg-gray-50 rounded-xl p-3 text-xs text-[#5f6368] flex justify-between">
+            <span>Users: <strong className="text-[#202124]">{tenant.currentUsers} / {form.maxUsers}</strong></span>
+            <span>Total storage: <strong className="text-[#202124]">{((form.storagePerUserMb * form.maxUsers) / 1024).toFixed(1)} GB</strong></span>
           </div>
 
           {/* Active toggle */}
@@ -108,7 +135,7 @@ export default function EditTenantModal({ tenant, onClose }: Props) {
             </div>
             <button
               type="button"
-              onClick={() => set("active", !form.active)}
+              onClick={() => setForm(f => ({ ...f, active: !f.active }))}
               className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full transition-colors ${
                 form.active ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
@@ -118,14 +145,9 @@ export default function EditTenantModal({ tenant, onClose }: Props) {
             </button>
           </div>
 
-          {/* Actions */}
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
-            <button
-              type="submit"
-              disabled={mutation.isPending || form.maxUsers < (tenant.currentUsers || 0)}
-              className="btn-primary"
-            >
+            <button type="submit" disabled={mutation.isPending || tooFewUsers} className="btn-primary">
               {mutation.isPending ? "Saving…" : "Save Changes"}
             </button>
           </div>
