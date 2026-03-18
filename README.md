@@ -1,53 +1,6 @@
 # MailServer — Self-Hosted G Suite / M365 Alternative
 
-A fully self-hosted workspace stack running on 2 Raspberry Pi 4s with automatic failover.
-
----
-
-## What was created
-
-### Mail Stack (`docker-compose.yml`)
-- **Postfix** — SMTP server with virtual mailboxes, SASL auth via Dovecot, Rspamd milter
-- **Dovecot** — IMAP/POP3 + LMTP delivery + Sieve filtering, auth via checkpassword → API → MongoDB
-- **Rspamd** — Spam filter with Bayesian learning (Redis-backed) + DKIM signing
-- **ClamAV** — Antivirus scanning
-- **MongoDB** — Primary database (user accounts, settings, mail metadata) with Replica Set for HA
-- **Redis** — Rspamd cache + session store
-
-### Application Layer (`docker-compose.apps.yml`)
-- **Node.js API** (`backend/`) — JWT auth, IMAP proxy (`imapflow`), SMTP proxy (`nodemailer`), CalDAV/CardDAV/WebDAV proxy to Nextcloud, internal auth endpoint for Dovecot checkpassword
-- **React Webmail** (`frontend/`) — Gmail-like UI: inbox 3-pane with avatars, compose modal, folder tree with unread counts, calendar (FullCalendar), contacts, files with drag-and-drop upload
-- **Nextcloud + Collabora Online** — Full office suite (Docs, Sheets, Presentations), Calendar, Contacts, Files in the browser (LibreOffice in the browser — free, open-source)
-- **Nginx** — Reverse proxy for all web services with SSL
-- **HAProxy** — TCP-level proxy for SMTP/IMAP ports across both Pis
-
-### High Availability (2 Raspberry Pis)
-- **Keepalived** — VRRP Virtual IP: Pi-1 is MASTER (priority 200), Pi-2 is BACKUP (priority 100). Failover in ~2 seconds
-- **GlusterFS** — Replicated 2-way filesystem for mail data, Nextcloud files, SSL certs
-- **MongoDB Replica Set** — Synchronous multi-member database replication (primary + secondary + arbiter)
-
-### Scripts
-
-| Script | Purpose |
-|---|---|
-| `setup-primary.sh` | Bootstrap Pi-1 (Docker, GlusterFS, Keepalived, DKIM key) |
-| `setup-secondary.sh` | Bootstrap Pi-2 |
-| `setup-glusterfs.sh` | Create replicated GlusterFS volumes |
-| `setup-mongodb-rs.sh` | Initialize MongoDB Replica Set |
-| `setup-certificates.sh` | Get Let's Encrypt SSL certs |
-| `add-mail-user.sh` | Create a mail account |
-| `health-check.sh` | Check all services |
-| `monitor.sh` | Continuous monitoring + email/Slack alerts |
-| `backup.sh` | Backup mail data + DB |
-
-### First thing to do: fill in your `.env`
-
-```bash
-cp .env.example .env
-# Edit: MAIL_DOMAIN, VIRTUAL_IP, PI_PRIMARY_IP, PI_SECONDARY_IP, all passwords
-```
-
-Then follow the steps in this README. The full setup takes about an hour on first run (mostly ClamAV signature download).
+A fully self-hosted workspace stack running on 2 Raspberry Pi 4s with automatic failover. Includes webmail, shared calendars, office suite (LibreOffice in the browser), file storage, and a full multi-tenant company/user management system.
 
 ---
 
@@ -61,15 +14,16 @@ Then follow the steps in this README. The full setup takes about an hour on firs
 | DKIM signing | Rspamd |
 | Webmail UI | React + TypeScript (Gmail-like) |
 | REST API | Node.js + Express + TypeScript |
-| Documents / Sheets / Slides | Nextcloud + **Collabora Online** (LibreOffice — free & open source) |
-| Calendar | Nextcloud Calendar (CalDAV) |
+| Documents / Sheets / Slides | Nextcloud + Collabora Online (LibreOffice — free & open source) |
+| Calendar | Personal (Nextcloud CalDAV) + Shared Team Calendar |
 | Contacts | Nextcloud Contacts (CardDAV) |
 | File storage | Nextcloud Files (WebDAV) |
-| Database | **MongoDB** (Replica Set for HA) |
+| Database | MongoDB (Replica Set for HA) |
 | SSL | Let's Encrypt via Certbot |
 | High Availability | Keepalived (VRRP) + GlusterFS + MongoDB Replica Set |
 | Load balancing | HAProxy |
 | Containerization | Docker Compose |
+| Multi-tenant | Super Admin → Company Admins → Users with strict data isolation |
 
 ---
 
@@ -96,102 +50,197 @@ Then follow the steps in this README. The full setup takes about an hour on firs
          GlusterFS ←──────→ GlusterFS
 ```
 
-When Pi-1 fails, Keepalived promotes Pi-2 in **~2 seconds**. GlusterFS keeps mail data, Nextcloud files, and SSL certs in sync between both Pis automatically. MongoDB Replica Set keeps the database replicated with automatic primary election on failover.
+When Pi-1 fails, Keepalived promotes Pi-2 in **~2 seconds**. GlusterFS keeps mail data, Nextcloud files, and SSL certs in sync between both Pis. MongoDB Replica Set keeps the database replicated with automatic primary election.
 
 ---
 
-## Quick Start
+## Multi-Tenant Role System
 
-### 1. Prerequisites
+Three roles with strict data isolation:
 
-- 2× Raspberry Pi 4 (4GB+ RAM recommended) with Raspberry Pi OS Bookworm 64-bit
+| Role | Can Do |
+|---|---|
+| **Super Admin** | Create/edit/deactivate companies (tenants); set max users and storage limits per company |
+| **Admin** (Company Admin) | Create/edit/deactivate users within their own company only; cannot see other companies |
+| **User** | Send/receive email, personal calendar, shared team calendar, contacts, files |
+
+**Data isolation rules:**
+- Admin A can never see, list, or modify Admin B's users — enforced at both middleware and DB query level
+- `tenantDomain` on shared calendar events is always set server-side from the JWT, never from client input
+- Admin user creation always forces email to `localPart@admin's-domain` — client cannot override the domain
+
+---
+
+## Prerequisites
+
+- 2× Raspberry Pi 4 (4 GB+ RAM recommended) with Raspberry Pi OS Bookworm 64-bit
 - A domain name with DNS control
-- Static LAN IPs for both Pis + a free LAN IP for the Virtual IP
-- Port forwarding on your router: 25, 80, 443, 587, 993 → VIP
+- Static LAN IPs for both Pis + one free LAN IP for the Virtual IP
+- Router port forwarding: 25, 80, 443, 587, 993 → Virtual IP
+- Docker and Docker Compose installed on both Pis
 
-### 2. Configure
+---
+
+## Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/Var6/MailServer.git
+cd MailServer
+```
+
+---
+
+## Step 2 — Configure Your Environment
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Key values to set:
+Fill in every value. The key ones:
+
 ```env
+# Your domain
 MAIL_DOMAIN=yourdomain.com
 MAIL_HOSTNAME=mail.yourdomain.com
-VIRTUAL_IP=192.168.1.100       # Free LAN IP for VIP
-PI_PRIMARY_IP=192.168.1.10
-PI_SECONDARY_IP=192.168.1.11
+
+# Network (use your actual IPs)
+VIRTUAL_IP=192.168.1.100        # A free LAN IP — this is what DNS points to
+PI_PRIMARY_IP=192.168.1.10      # Pi-1 LAN IP
+PI_SECONDARY_IP=192.168.1.11    # Pi-2 LAN IP
+
+# Passwords — change ALL of these
+MONGO_ROOT_PASSWORD=changeme
+MONGO_APP_PASSWORD=changeme
+REDIS_PASSWORD=changeme
+JWT_SECRET=changeme-at-least-32-chars
+JWT_REFRESH_SECRET=changeme-at-least-32-chars
+NEXTCLOUD_ADMIN_PASSWORD=changeme
+DOVECOT_INTERNAL_SECRET=changeme
 ```
 
-### 3. DNS Records
+---
+
+## Step 3 — DNS Records
+
+Add these records at your DNS provider. All A records point to your **public IP** (the one your router NATs from).
 
 ```
-# Mail routing
-MX       yourdomain.com          mail.yourdomain.com   priority 10
+# Mail
+MX    yourdomain.com               mail.yourdomain.com    priority 10
+A     mail.yourdomain.com          YOUR_PUBLIC_IP
+A     cloud.yourdomain.com         YOUR_PUBLIC_IP
+A     office.yourdomain.com        YOUR_PUBLIC_IP
 
-# A records (all point to your public IP)
-A        mail.yourdomain.com     YOUR_PUBLIC_IP
-A        cloud.yourdomain.com    YOUR_PUBLIC_IP
-A        office.yourdomain.com   YOUR_PUBLIC_IP
-
-# SPF
-TXT      yourdomain.com          "v=spf1 mx a:mail.yourdomain.com -all"
+# SPF — allow only your mail server to send
+TXT   yourdomain.com               "v=spf1 mx a:mail.yourdomain.com -all"
 
 # DMARC
-TXT      _dmarc.yourdomain.com   "v=DMARC1; p=quarantine; rua=mailto:admin@yourdomain.com"
+TXT   _dmarc.yourdomain.com        "v=DMARC1; p=quarantine; rua=mailto:admin@yourdomain.com"
 
-# DKIM (key printed during setup-primary.sh)
-TXT      mail._domainkey.yourdomain.com   "v=DKIM1; k=rsa; p=<YOUR_PUBLIC_KEY>"
+# DKIM — key is printed at the end of setup-primary.sh
+TXT   mail._domainkey.yourdomain.com   "v=DKIM1; k=rsa; p=<YOUR_PUBLIC_KEY>"
 ```
 
-### 4. Setup Pi-1 (Primary)
+> DKIM: run `setup-primary.sh` first — it prints the exact TXT record value at the end.
+
+---
+
+## Step 4 — Bootstrap Pi-1 (Primary)
+
+SSH into Pi-1 and run:
 
 ```bash
 sudo bash scripts/setup-primary.sh
 ```
 
-### 5. Setup Pi-2 (Secondary)
+This installs Docker, GlusterFS, Keepalived (as MASTER), generates a DKIM key, and starts all services.
+
+At the end it prints your **DKIM public key** — add that to DNS now.
+
+---
+
+## Step 5 — Bootstrap Pi-2 (Secondary)
+
+SSH into Pi-2 and run:
 
 ```bash
 sudo bash scripts/setup-secondary.sh
 ```
 
-### 6. Set up shared storage
+This installs the same stack but configures Keepalived as BACKUP (it takes over only when Pi-1 is down).
+
+---
+
+## Step 6 — Set Up Shared Storage (GlusterFS)
+
+On Pi-1:
 
 ```bash
-gluster peer probe 192.168.1.11
+gluster peer probe 192.168.1.11   # Use Pi-2's actual IP
 sudo bash scripts/setup-glusterfs.sh
 ```
 
-### 7. Bootstrap MongoDB Replica Set
+This creates replicated volumes for `/gluster/mail`, `/gluster/nextcloud`, and `/gluster/ssl` — everything stays in sync between both Pis automatically.
+
+---
+
+## Step 7 — Initialize MongoDB Replica Set
+
+On Pi-1:
 
 ```bash
 sudo bash scripts/setup-mongodb-rs.sh
 ```
 
-### 8. Get SSL Certificates
+Connects to both MongoDB instances and initializes the replica set so the database is replicated.
+
+---
+
+## Step 8 — Get SSL Certificates
 
 ```bash
 sudo bash scripts/setup-certificates.sh
 ```
 
-### 9. Start Everything
+Uses Certbot to get Let's Encrypt certs for `mail.yourdomain.com`, `cloud.yourdomain.com`, and `office.yourdomain.com`. Certs are stored in the shared GlusterFS volume so both Pis use the same cert.
+
+---
+
+## Step 9 — Start All Services
+
+Run on **both Pis**:
 
 ```bash
-# On both Pis:
 docker compose up -d
 docker compose -f docker-compose.apps.yml up -d
 ```
 
-### 10. Create First Mail User
+Wait ~2 minutes for ClamAV to load its signatures on first start.
+
+Check everything is running:
 
 ```bash
-sudo bash scripts/add-mail-user.sh admin@yourdomain.com
+bash scripts/health-check.sh
 ```
 
-### 11. Enable Collabora in Nextcloud
+---
+
+## Step 10 — Create the Super Admin Account
+
+Run **once** after the stack is up:
+
+```bash
+SUPERADMIN_EMAIL=superadmin@yourdomain.com \
+SUPERADMIN_PASS=YourSecurePassword123! \
+bash scripts/seed-superadmin.sh
+```
+
+This creates the first superadmin account in MongoDB. Keep these credentials safe — this account can manage all companies.
+
+---
+
+## Step 11 — Enable Office Suite (Collabora)
 
 ```bash
 docker exec mailserver-nextcloud php occ app:install richdocuments
@@ -199,51 +248,103 @@ docker exec mailserver-nextcloud php occ config:app:set richdocuments wopi_url \
   --value="https://office.yourdomain.com"
 ```
 
+After this, users can open `.docx`, `.xlsx`, `.pptx` files directly in the browser from Nextcloud Files.
+
+---
+
+## Using the System
+
+### As Super Admin
+
+1. Log in at `https://mail.yourdomain.com` with your superadmin credentials
+2. You land on the **Tenants** page automatically
+3. Click **New Tenant** to create a company:
+   - Enter company name and domain (e.g. `acme.com`)
+   - Set the admin's email address (must be `@acme.com`)
+   - Set a password for the admin account
+   - Set **Max Users** (how many email accounts this company can have)
+   - Set **Storage per User** in MB (e.g. 512 MB, 1024 MB = 1 GB)
+4. The company admin can now log in and start creating users
+
+To edit limits or deactivate a company later, click the edit (pencil) or toggle button on the Tenants page.
+
+---
+
+### As Company Admin
+
+1. Log in at `https://mail.yourdomain.com` with your admin credentials
+2. You land on the **Users** page automatically
+3. Click **New User** to create an email account:
+   - Enter the username (local part only — e.g. `john`, email becomes `john@yourdomain.com`)
+   - Set a password (user can change it later)
+   - Optionally set a display name and mailbox quota
+4. The user can now log in and use email, calendar, files, and office
+
+The **Users** page shows total users, active users, and remaining slots from your quota.
+
+---
+
+### As a Regular User
+
+Log in at `https://mail.yourdomain.com` and you get:
+
+| Section | What you can do |
+|---|---|
+| **Mail** | Read, compose, reply, forward email. Folders in the sidebar (Inbox, Sent, Drafts, Spam, Trash). |
+| **Calendar** | Personal calendar (synced with Nextcloud CalDAV). Switch to **Team Calendar** to see and add company-wide events. |
+| **Contacts** | CardDAV contacts synced with Nextcloud. |
+| **Files** | Upload, download, organize files. Open documents, spreadsheets, and presentations in-browser with Collabora (LibreOffice). |
+
+**Team Calendar:** Anyone in your company can add events. Only the event creator, company admin, or superadmin can delete events. Events are scoped to your company — other companies cannot see them.
+
+---
+
+## Email Client Setup (Outlook, Thunderbird, Apple Mail)
+
+| Protocol | Server | Port | Security |
+|---|---|---|---|
+| IMAP (incoming) | mail.yourdomain.com | 993 | SSL/TLS |
+| SMTP (outgoing) | mail.yourdomain.com | 587 | STARTTLS |
+| CalDAV (calendar) | cloud.yourdomain.com | 443 | SSL |
+| CardDAV (contacts) | cloud.yourdomain.com | 443 | SSL |
+
+Username is the full email address. Password is the account password.
+
 ---
 
 ## Accessing Your Services
 
 | Service | URL |
 |---|---|
-| Webmail | `https://mail.yourdomain.com` |
-| Nextcloud (Files/Calendar/Contacts/Office) | `https://cloud.yourdomain.com` |
+| Webmail + Admin panels | `https://mail.yourdomain.com` |
+| Nextcloud (Files / Calendar / Contacts / Office) | `https://cloud.yourdomain.com` |
 | Collabora Online | Embedded inside Nextcloud |
 | HAProxy Stats | `http://PI_IP:8404/stats` |
-
----
-
-## Email Client Configuration
-
-| Protocol | Server | Port | Security |
-|---|---|---|---|
-| IMAP | mail.yourdomain.com | 993 | SSL/TLS |
-| SMTP | mail.yourdomain.com | 587 | STARTTLS |
-| CalDAV | cloud.yourdomain.com | 443 | SSL |
-| CardDAV | cloud.yourdomain.com | 443 | SSL |
 
 ---
 
 ## Monitoring & Maintenance
 
 ```bash
-# Check all services
+# Check all services are healthy
 bash scripts/health-check.sh
 
-# Continuous monitoring with alerts
+# Continuous monitoring with email/Slack alerts
 nohup bash scripts/monitor.sh &
 
-# Backup
+# Backup mail data and database
 bash scripts/backup.sh
 
-# View logs
+# View mail server logs
 docker logs mailserver-postfix
 docker logs mailserver-dovecot
+docker logs mailserver-api
 
-# MongoDB status
+# Check MongoDB replica set status
 docker exec mailserver-mongodb mongosh --eval "rs.status()"
 
-# Add user
-bash scripts/add-mail-user.sh user@yourdomain.com
+# Check spam filter stats
+docker exec mailserver-rspamd rspamc stat
 ```
 
 ---
@@ -254,11 +355,12 @@ bash scripts/add-mail-user.sh user@yourdomain.com
 # Simulate Pi-1 failure
 sudo systemctl stop keepalived docker
 
-# Verify Pi-2 took over VIP
-ssh pi@192.168.1.11 "ip addr show | grep 192.168.1.100"
+# On Pi-2 — verify it grabbed the Virtual IP
+ip addr show | grep 192.168.1.100    # Should appear here
 
 # Restore Pi-1
 sudo systemctl start docker keepalived
+# Pi-1 automatically reclaims MASTER role (~2 seconds)
 ```
 
 ---
@@ -278,7 +380,7 @@ sudo systemctl start docker keepalived
 | Nginx + HAProxy | 30 MB |
 | **Total** | **~2.7 GB** |
 
-> Pi 4 4GB works. Pi 4 8GB recommended if multiple users edit documents simultaneously.
+Pi 4 4 GB works. Pi 4 8 GB recommended if multiple users edit documents simultaneously.
 
 ---
 
@@ -286,40 +388,80 @@ sudo systemctl start docker keepalived
 
 ```
 MailServer/
-├── docker-compose.yml          # Core mail stack
-├── docker-compose.apps.yml     # Web apps
-├── .env.example                # Config template
+├── docker-compose.yml              # Core mail stack (Postfix, Dovecot, MongoDB, Redis, Rspamd, ClamAV)
+├── docker-compose.apps.yml         # App layer (API, webmail, Nextcloud, Collabora, Nginx, HAProxy)
+├── .env.example                    # Config template — copy to .env and fill in
 ├── config/
-│   ├── postfix/                # Postfix SMTP config
-│   ├── dovecot/                # Dovecot IMAP config (checkpassword auth)
-│   ├── rspamd/                 # Spam filter
-│   ├── clamav/                 # Antivirus
-│   ├── nginx/                  # Reverse proxy
-│   ├── haproxy/                # TCP load balancer
-│   ├── keepalived/             # HA VIP configs
-│   ├── mongodb/                # MongoDB Replica Set init
-│   ├── redis/                  # Cache config
-│   └── nextcloud/              # Nextcloud config
+│   ├── postfix/                    # SMTP config, virtual domains/users/aliases
+│   ├── dovecot/                    # IMAP config, checkpassword auth
+│   ├── rspamd/                     # Spam filter + DKIM signing
+│   ├── nginx/                      # Reverse proxy with SSL
+│   ├── haproxy/                    # TCP proxy for SMTP/IMAP ports
+│   ├── keepalived/                 # VRRP HA config (master + backup)
+│   └── mongodb/                    # Replica set init script
 ├── docker/
-│   ├── postfix/                # ARM64 Postfix Dockerfile
-│   └── dovecot/                # ARM64 Dovecot Dockerfile (with checkpassword)
-├── backend/                    # Node.js REST API
+│   ├── postfix/                    # ARM64 Postfix Dockerfile
+│   └── dovecot/                    # ARM64 Dovecot Dockerfile + checkpassword.sh
+├── backend/                        # Node.js / Express / TypeScript REST API
 │   └── src/
-│       ├── models/             # Mongoose models (User)
-│       ├── routes/             # auth, mail, calendar, contacts, files, internal
-│       └── services/           # imapService, smtpService, nextcloudService
-├── frontend/                   # React webmail UI
+│       ├── models/                 # Mongoose models: User, Domain, Tenant, SharedEvent
+│       ├── routes/                 # auth, mail, calendar, contacts, files, admin, tenants, internal
+│       ├── middleware/             # requireAuth, requireRole, requireSameTenant
+│       └── services/              # authService, imapService, smtpService, nextcloudService
+├── frontend/                       # React + TypeScript + Tailwind webmail UI
 │   └── src/
-│       ├── pages/              # Login, Inbox, Calendar, Contacts, Files
-│       └── components/         # Mail UI, compose, folder tree
+│       ├── pages/
+│       │   ├── Login.tsx           # Gmail-style two-step login
+│       │   ├── Inbox.tsx           # 3-pane mail view
+│       │   ├── Calendar.tsx        # Personal + Team calendar tabs
+│       │   ├── Contacts.tsx
+│       │   ├── Files.tsx
+│       │   ├── superadmin/         # Tenants page + Create/Edit modals
+│       │   └── admin/              # Users page + Create/Edit modals
+│       ├── components/
+│       │   ├── Layout/             # Sidebar (role-conditional nav), Header, Layout
+│       │   └── Mail/               # InboxList, MessageView, ComposeModal, FolderTree
+│       └── api/                    # authApi, mailApi, adminApi, superadminApi, sharedCalendarApi
 └── scripts/
-    ├── setup-primary.sh
-    ├── setup-secondary.sh
-    ├── setup-glusterfs.sh
-    ├── setup-mongodb-rs.sh
-    ├── setup-certificates.sh
-    ├── add-mail-user.sh
-    ├── health-check.sh
-    ├── monitor.sh
-    └── backup.sh
+    ├── setup-primary.sh            # Bootstrap Pi-1
+    ├── setup-secondary.sh          # Bootstrap Pi-2
+    ├── setup-glusterfs.sh          # Create replicated GlusterFS volumes
+    ├── setup-mongodb-rs.sh         # Initialize MongoDB Replica Set
+    ├── setup-certificates.sh       # Get Let's Encrypt SSL certs
+    ├── seed-superadmin.sh          # Create the first superadmin account (run once)
+    ├── add-mail-user.sh            # CLI: add a mail user
+    ├── health-check.sh             # Check all services
+    ├── monitor.sh                  # Continuous monitoring + alerts
+    └── backup.sh                   # Backup mail data + DB
 ```
+
+---
+
+## What Was Built
+
+### Mail Stack (`docker-compose.yml`)
+- **Postfix** — SMTP server with virtual mailboxes, SASL auth via Dovecot, Rspamd milter
+- **Dovecot** — IMAP/POP3 + LMTP delivery + Sieve filtering, auth via checkpassword → API → MongoDB
+- **Rspamd** — Spam filter with Bayesian learning (Redis-backed) + DKIM signing
+- **ClamAV** — Antivirus scanning integrated with Postfix milter
+- **MongoDB** — Primary database (users, tenants, shared events) with Replica Set
+- **Redis** — Rspamd cache
+
+### Application Layer (`docker-compose.apps.yml`)
+- **Node.js API** — JWT auth (access + refresh tokens), IMAP proxy, SMTP proxy, CalDAV/CardDAV/WebDAV proxy to Nextcloud, internal Dovecot auth endpoint
+- **React Webmail** — Gmail-like 3-pane inbox, compose, folder tree, calendar, contacts, files
+- **Nextcloud + Collabora Online** — Office suite (LibreOffice Docs/Sheets/Slides in the browser), Calendar, Contacts, Files
+- **Nginx** — SSL reverse proxy for all web services
+- **HAProxy** — TCP proxy for SMTP/IMAP across both Pis
+
+### High Availability
+- **Keepalived** — VRRP Virtual IP: Pi-1 is MASTER (priority 200), Pi-2 is BACKUP (priority 100). Failover in ~2 seconds
+- **GlusterFS** — 2-way replicated filesystem for mail data, Nextcloud files, SSL certs
+- **MongoDB Replica Set** — Synchronous replication with automatic primary election
+
+### Multi-Tenant System
+- **Three roles**: superadmin, admin (company admin), user
+- **Tenants page** (superadmin): create companies, set max users + storage limits, activate/deactivate
+- **Users page** (admin): create/edit/deactivate users within own company only
+- **Strict isolation**: `requireSameTenant()` middleware + domain-filtered DB queries (double enforcement)
+- **Shared Team Calendar**: MongoDB-backed, scoped to tenant domain, visible to all company users
