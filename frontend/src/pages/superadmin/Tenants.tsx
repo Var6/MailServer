@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2, Users, HardDrive, Plus, ToggleLeft, ToggleRight,
-  Edit2, Trash2, Search, ChevronDown, ChevronUp, AlertTriangle
+  Edit2, Trash2, Search, ChevronDown, ChevronUp, AlertTriangle, Receipt
 } from "lucide-react";
 import { listTenants, updateTenant, deleteTenant, createTenant, type Tenant } from "../../api/superadminApi.ts";
 import { useToastStore } from "../../store/index.ts";
 import { formatMailDate } from "../../lib/utils.ts";
 import CreateTenantModal from "./CreateTenantModal.tsx";
 import EditTenantModal from "./EditTenantModal.tsx";
+import BillModal from "./BillModal.tsx";
 
 export default function TenantsPage() {
   const qc = useQueryClient();
@@ -16,6 +17,7 @@ export default function TenantsPage() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Tenant | null>(null);
+  const [billing, setBilling] = useState<Tenant | null>(null);
   const [sortBy, setSortBy] = useState<"name" | "users" | "created">("created");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -81,9 +83,9 @@ export default function TenantsPage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Total Tenants",  value: tenants.length,  icon: Building2, color: "text-blue-600 bg-blue-50" },
-            { label: "Active Tenants", value: activeTenants,   icon: ToggleRight, color: "text-green-600 bg-green-50" },
-            { label: "Total Users",    value: totalUsers,       icon: Users, color: "text-purple-600 bg-purple-50" },
+            { label: "Total Tenants",  value: tenants.length,  icon: Building2,    color: "text-blue-600 bg-blue-50" },
+            { label: "Active Tenants", value: activeTenants,   icon: ToggleRight,  color: "text-green-600 bg-green-50" },
+            { label: "Total Users",    value: totalUsers,       icon: Users,        color: "text-purple-600 bg-purple-50" },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
@@ -100,7 +102,6 @@ export default function TenantsPage() {
 
       {/* Table area */}
       <div className="flex-1 overflow-auto p-6">
-        {/* Search */}
         <div className="relative mb-4 max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -113,117 +114,121 @@ export default function TenantsPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">
-                  <SortHeader col="name" label="Company" />
-                </th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Domain</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Admin</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">
-                  <SortHeader col="users" label="Users" />
-                </th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Storage</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">
-                  <SortHeader col="created" label="Created" />
-                </th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Status</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && (
-                <tr><td colSpan={8} className="text-center py-12 text-[#5f6368] text-sm">Loading…</td></tr>
-              )}
-              {!isLoading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="text-center py-16">
-                    <Building2 size={40} className="mx-auto text-gray-300 mb-3" />
-                    <p className="text-sm text-[#5f6368]">{search ? "No tenants match your search" : "No tenants yet — create your first one"}</p>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px]">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">
+                    <SortHeader col="name" label="Company" />
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Domain</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">
+                    <SortHeader col="users" label="Users" />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Storage</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-[#5f6368] uppercase tracking-wider">
+                    <SortHeader col="created" label="Created" />
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#5f6368] uppercase tracking-wider">Actions</th>
                 </tr>
-              )}
-              {filtered.map(t => (
-                <TenantRow
-                  key={t._id}
-                  tenant={t}
-                  onToggle={() => toggleMutation.mutate(t)}
-                  onEdit={() => setEditing(t)}
-                  onDelete={() => {
-                    if (confirm(`Deactivate tenant "${t.name}" and all its users?`)) deleteMutation.mutate(t.domain);
-                  }}
-                />
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {isLoading && (
+                  <tr><td colSpan={7} className="text-center py-12 text-[#5f6368] text-sm">Loading…</td></tr>
+                )}
+                {!isLoading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-16">
+                      <Building2 size={40} className="mx-auto text-gray-300 mb-3" />
+                      <p className="text-sm text-[#5f6368]">{search ? "No tenants match your search" : "No tenants yet — create your first one"}</p>
+                    </td>
+                  </tr>
+                )}
+                {filtered.map(t => (
+                  <TenantRow
+                    key={t._id}
+                    tenant={t}
+                    onToggle={() => toggleMutation.mutate(t)}
+                    onEdit={() => setEditing(t)}
+                    onBill={() => setBilling(t)}
+                    onDelete={() => {
+                      if (confirm(`Deactivate tenant "${t.name}" and all its users?`)) deleteMutation.mutate(t.domain);
+                    }}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {showCreate && <CreateTenantModal onClose={() => setShowCreate(false)} />}
       {editing   && <EditTenantModal tenant={editing} onClose={() => setEditing(null)} />}
+      {billing   && <BillModal tenant={billing} onClose={() => setBilling(null)} />}
     </div>
   );
 }
 
-function TenantRow({ tenant: t, onToggle, onEdit, onDelete }: {
+function TenantRow({ tenant: t, onToggle, onEdit, onBill, onDelete }: {
   tenant: Tenant;
   onToggle: () => void;
   onEdit: () => void;
+  onBill: () => void;
   onDelete: () => void;
 }) {
-  const usagePct = Math.min(100, Math.round((t.currentUsers / t.maxUsers) * 100));
+  const usagePct = Math.min(100, Math.round((t.currentUsers / Math.max(t.maxUsers, 1)) * 100));
   const overLimit = t.currentUsers >= t.maxUsers;
 
   return (
     <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-      <td className="px-5 py-4">
+      <td className="px-5 py-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-semibold text-sm uppercase">
+          <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-semibold text-sm uppercase flex-shrink-0">
             {t.name[0]}
           </div>
-          <span className="font-medium text-[#202124] text-sm">{t.name}</span>
+          <div className="min-w-0">
+            <p className="font-medium text-[#202124] text-sm truncate">{t.name}</p>
+            <p className="text-xs text-[#5f6368] truncate">{t.adminEmail}</p>
+          </div>
         </div>
       </td>
-      <td className="px-5 py-4">
-        <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-[#5f6368]">{t.domain}</code>
+      <td className="px-5 py-3.5">
+        <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-[#5f6368] whitespace-nowrap">{t.domain}</code>
       </td>
-      <td className="px-5 py-4 text-sm text-[#5f6368]">{t.adminEmail}</td>
-      <td className="px-5 py-4">
+      <td className="px-4 py-3.5">
         <div className="flex items-center gap-2">
-          <div className="flex-1 max-w-[80px] bg-gray-200 rounded-full h-1.5">
-            <div
-              className={`h-1.5 rounded-full ${overLimit ? "bg-red-500" : "bg-blue-500"}`}
-              style={{ width: `${usagePct}%` }}
-            />
+          <div className="w-16 bg-gray-200 rounded-full h-1.5 flex-shrink-0">
+            <div className={`h-1.5 rounded-full ${overLimit ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${usagePct}%` }} />
           </div>
-          <span className={`text-xs font-medium ${overLimit ? "text-red-600" : "text-[#5f6368]"}`}>
+          <span className={`text-xs font-medium whitespace-nowrap ${overLimit ? "text-red-600" : "text-[#5f6368]"}`}>
             {t.currentUsers}/{t.maxUsers}
           </span>
-          {overLimit && <AlertTriangle size={12} className="text-red-500" />}
+          {overLimit && <AlertTriangle size={11} className="text-red-500 flex-shrink-0" />}
         </div>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-4 py-3.5 whitespace-nowrap">
         <div className="flex items-center gap-1 text-xs text-[#5f6368]">
-          <HardDrive size={12} />
+          <HardDrive size={11} />
           {t.storagePerUserMb >= 1024 ? `${(t.storagePerUserMb/1024).toFixed(1)} GB` : `${t.storagePerUserMb} MB`}/user
         </div>
       </td>
-      <td className="px-5 py-4 text-xs text-[#5f6368]">{formatMailDate(t.createdAt)}</td>
-      <td className="px-5 py-4">
-        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full
+      <td className="px-4 py-3.5">
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap
           ${t.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${t.active ? "bg-green-500" : "bg-gray-400"}`} />
           {t.active ? "Active" : "Inactive"}
         </span>
       </td>
-      <td className="px-5 py-4">
-        <div className="flex items-center gap-1">
-          <button onClick={onEdit}   className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-blue-600 transition-colors"><Edit2 size={14} /></button>
-          <button onClick={onToggle} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-orange-500 transition-colors">
+      <td className="px-4 py-3.5 text-xs text-[#5f6368] whitespace-nowrap">{formatMailDate(t.createdAt)}</td>
+      <td className="px-4 py-3.5">
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={onEdit} title="Edit" className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-blue-600 transition-colors"><Edit2 size={14} /></button>
+          <button onClick={onBill} title="Send Bill" className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600 transition-colors"><Receipt size={14} /></button>
+          <button onClick={onToggle} title={t.active ? "Deactivate" : "Activate"} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-orange-500 transition-colors">
             {t.active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
           </button>
-          <button onClick={onDelete} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+          <button onClick={onDelete} title="Delete" className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
         </div>
       </td>
     </tr>
