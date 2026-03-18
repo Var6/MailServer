@@ -1,386 +1,252 @@
-# MailServer — Self-Hosted G Suite / M365 Alternative
+# MailServer — Cloud Deployment (No Pi / No SSL Required)
 
-A fully self-hosted workspace stack running on 2 Raspberry Pi 4s with automatic failover. Includes webmail, shared calendars, office suite (LibreOffice in the browser), file storage, and a full multi-tenant company/user management system.
+> **This is the `vercel-deploy` branch** — for deploying without Raspberry Pi hardware or manual SSL setup.
+> - Frontend → **Vercel** (free, automatic SSL)
+> - Backend → **Render.com** (free tier Node.js web service)
+> - Database → **MongoDB Atlas** (free M0 cluster)
+>
+> For the full self-hosted Pi deployment, see the [`main` branch](https://github.com/Var6/MailServer).
 
 ---
 
-## What's Included
+## What Works in Cloud Mode
 
-| Feature | Technology |
+| Feature | Status |
 |---|---|
-| Email (SMTP/IMAP) | Postfix + Dovecot |
-| Spam filtering | Rspamd + Bayesian learning |
-| Antivirus | ClamAV |
-| DKIM signing | Rspamd |
-| Webmail UI | React + TypeScript (Gmail-like) |
-| REST API | Node.js + Express + TypeScript |
-| Documents / Sheets / Slides | Nextcloud + Collabora Online (LibreOffice — free & open source) |
-| Calendar | Personal (Nextcloud CalDAV) + Shared Team Calendar |
-| Contacts | Nextcloud Contacts (CardDAV) |
-| File storage | Nextcloud Files (WebDAV) |
-| Database | MongoDB (Replica Set for HA) |
-| SSL | Let's Encrypt via Certbot |
-| High Availability | Keepalived (VRRP) + GlusterFS + MongoDB Replica Set |
-| Load balancing | HAProxy |
-| Containerization | Docker Compose |
-| Multi-tenant | Super Admin → Company Admins → Users with strict data isolation |
+| Login / JWT auth | ✅ Works |
+| Super Admin → Manage companies (tenants) | ✅ Works |
+| Company Admin → Manage users | ✅ Works |
+| Shared Team Calendar | ✅ Works |
+| Webmail inbox / send email | ❌ Needs Postfix + Dovecot |
+| Contacts | ❌ Needs Nextcloud |
+| Files / Office suite | ❌ Needs Nextcloud + Collabora |
+| Personal calendar | ❌ Needs Nextcloud CalDAV |
+
+The admin panels, role system, and team calendar are fully functional. Mail features gracefully return a "not configured" error instead of crashing.
 
 ---
 
-## Architecture
+## Step 1 — MongoDB Atlas (Free Database)
 
-```
-                    Internet
-                       |
-              [DNS A → Virtual IP]
-                       |
-            [Keepalived VRRP VIP]
-                /             \
-         [Pi-1 MASTER]    [Pi-2 BACKUP]
-              |                 |
-         HAProxy            HAProxy
-         Nginx              Nginx
-         Postfix            Postfix
-         Dovecot            Dovecot
-         Rspamd             Rspamd
-         Node API           Node API
-         Nextcloud          Nextcloud
-         MongoDB ←──RS──→  MongoDB
-         Redis              Redis
-         GlusterFS ←──────→ GlusterFS
-```
-
-When Pi-1 fails, Keepalived promotes Pi-2 in **~2 seconds**. GlusterFS keeps mail data, Nextcloud files, and SSL certs in sync between both Pis. MongoDB Replica Set keeps the database replicated with automatic primary election.
+1. Go to [cloud.mongodb.com](https://cloud.mongodb.com) → **Create a free account**
+2. Create a **free M0 cluster** (any region)
+3. Under **Database Access** → Add a database user with a password
+4. Under **Network Access** → Add IP `0.0.0.0/0` (allow all — Render's IPs change)
+5. Click **Connect** → **Drivers** → copy the connection string:
+   ```
+   mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/mailserver?retryWrites=true&w=majority
+   ```
+   Save this — you'll need it for Render.
 
 ---
 
-## Multi-Tenant Role System
+## Step 2 — Backend on Render.com (Free)
 
-Three roles with strict data isolation:
+1. Go to [dashboard.render.com](https://dashboard.render.com) → **New → Web Service**
+2. Connect your GitHub account and select the `MailServer` repo
+3. Set these options:
+   | Field | Value |
+   |---|---|
+   | Branch | `vercel-deploy` |
+   | Root Directory | `backend` |
+   | Runtime | `Node` |
+   | Build Command | `npm install && npm run build` |
+   | Start Command | `npm start` |
+4. Under **Environment Variables**, add:
 
-| Role | Can Do |
+   | Key | Value |
+   |---|---|
+   | `MONGO_URI` | Your Atlas connection string from Step 1 |
+   | `JWT_SECRET` | Click **Generate** — Render creates a secure value |
+   | `JWT_REFRESH_SECRET` | Click **Generate** |
+   | `CORS_ORIGIN` | Leave blank for now — fill in after Step 3 |
+   | `NODE_ENV` | `production` |
+   | `MAIL_DOMAIN` | `yourdomain.com` (or anything — not used in cloud mode) |
+
+5. Click **Create Web Service** → wait for the build to finish (~2 min)
+6. Copy your Render URL — it looks like `https://mailserver-api-xxxx.onrender.com`
+
+> **Note:** Render free tier spins down after 15 min of inactivity. The first request after that takes ~30s to wake up. Upgrade to Starter ($7/mo) to avoid this.
+
+---
+
+## Step 3 — Frontend on Vercel (Free)
+
+1. Go to [vercel.com](https://vercel.com) → **Add New → Project**
+2. Import your GitHub `MailServer` repo
+3. Configure the project:
+   | Field | Value |
+   |---|---|
+   | Branch | `vercel-deploy` |
+   | Root Directory | `frontend` |
+   | Framework | Vite (auto-detected) |
+   | Build Command | `npm run build` |
+   | Output Directory | `dist` |
+4. Under **Environment Variables**, add:
+   | Key | Value |
+   |---|---|
+   | `VITE_API_URL` | Your Render backend URL from Step 2 (e.g. `https://mailserver-api-xxxx.onrender.com`) |
+5. Click **Deploy** → wait ~1 min
+
+Copy your Vercel URL — it looks like `https://mailserver-xxxx.vercel.app`
+
+---
+
+## Step 4 — Connect Frontend ↔ Backend (CORS)
+
+Go back to **Render → Your Service → Environment** and update:
+
+| Key | Value |
 |---|---|
-| **Super Admin** | Create/edit/deactivate companies (tenants); set max users and storage limits per company |
-| **Admin** (Company Admin) | Create/edit/deactivate users within their own company only; cannot see other companies |
-| **User** | Send/receive email, personal calendar, shared team calendar, contacts, files |
+| `CORS_ORIGIN` | Your Vercel URL (e.g. `https://mailserver-xxxx.vercel.app`) |
 
-**Data isolation rules:**
-- Admin A can never see, list, or modify Admin B's users — enforced at both middleware and DB query level
-- `tenantDomain` on shared calendar events is always set server-side from the JWT, never from client input
-- Admin user creation always forces email to `localPart@admin's-domain` — client cannot override the domain
+Click **Save Changes** — Render redeploys automatically.
 
 ---
 
-## Prerequisites
+## Step 5 — Create the Super Admin Account
 
-- 2× Raspberry Pi 4 (4 GB+ RAM recommended) with Raspberry Pi OS Bookworm 64-bit
-- A domain name with DNS control
-- Static LAN IPs for both Pis + one free LAN IP for the Virtual IP
-- Router port forwarding: 25, 80, 443, 587, 993 → Virtual IP
-- Docker and Docker Compose installed on both Pis
+After both services are running, seed the superadmin via the Render shell or a local `mongosh` connected to Atlas:
+
+**Option A — Render Shell** (easiest):
+1. In the Render dashboard → your service → **Shell**
+2. Run:
+   ```bash
+   node -e "
+   const mongoose = require('mongoose');
+   const argon2 = require('argon2');
+   mongoose.connect(process.env.MONGO_URI).then(async () => {
+     const hash = await argon2.hash('YourPassword123!');
+     await mongoose.connection.db.collection('users').updateOne(
+       { email: 'superadmin@example.com' },
+       { \$set: { email: 'superadmin@example.com', password: hash, role: 'superadmin',
+                  domain: 'example.com', quotaMb: 1024, active: true, createdAt: new Date() } },
+       { upsert: true }
+     );
+     console.log('Done');
+     process.exit(0);
+   });
+   "
+   ```
+
+**Option B — Atlas Data Explorer**:
+1. In Atlas → your cluster → **Browse Collections → mailserver → users**
+2. Insert document:
+   ```json
+   {
+     "email": "superadmin@example.com",
+     "password": "<bcrypt hash of your password>",
+     "role": "superadmin",
+     "domain": "example.com",
+     "quotaMb": 1024,
+     "active": true,
+     "createdAt": { "$date": "2025-01-01T00:00:00Z" }
+   }
+   ```
+   > For the password hash, use [bcrypt-generator.com](https://bcrypt-generator.com) with cost 12.
 
 ---
 
-## Step 1 — Clone the Repository
+## Using the App
+
+Open your Vercel URL → log in with the superadmin credentials.
+
+### Super Admin
+
+- Land on **Tenants** page automatically
+- **New Tenant** → create a company with domain, admin email, max users, storage limit
+- The company admin can then log in and create users
+
+### Company Admin
+
+- Land on **Users** page automatically
+- **New User** → enter username (email becomes `username@companydomain.com`), password, optional display name
+- Edit or deactivate users from the table
+
+### Regular User
+
+- Land on **Mail** (inbox will show "mail server not configured" — expected in cloud mode)
+- **Calendar → Team Calendar** tab — fully works, shows and creates shared company events
+- Contacts and Files show "not configured" — expected
+
+---
+
+## Local Development (No Docker)
 
 ```bash
-git clone https://github.com/Var6/MailServer.git
-cd MailServer
+# 1. Start just MongoDB
+docker compose -f docker-compose.dev.yml up -d mongodb
+
+# 2. Start the backend
+cd backend
+cp ../.env.cloud.example .env   # edit MONGO_URI, JWT_SECRET etc.
+npm install
+npm run dev                     # starts on :3000
+
+# 3. Start the frontend (new terminal)
+cd frontend
+VITE_API_URL=http://localhost:3000 npm run dev   # starts on :5173
 ```
 
----
-
-## Step 2 — Configure Your Environment
+Or use the full dev compose (MongoDB + API together):
 
 ```bash
-cp .env.example .env
-nano .env
+docker compose -f docker-compose.dev.yml up -d
+cd frontend && npm install && npm run dev
 ```
 
-Fill in every value. The key ones:
-
-```env
-# Your domain
-MAIL_DOMAIN=yourdomain.com
-MAIL_HOSTNAME=mail.yourdomain.com
-
-# Network (use your actual IPs)
-VIRTUAL_IP=192.168.1.100        # A free LAN IP — this is what DNS points to
-PI_PRIMARY_IP=192.168.1.10      # Pi-1 LAN IP
-PI_SECONDARY_IP=192.168.1.11    # Pi-2 LAN IP
-
-# Passwords — change ALL of these
-MONGO_ROOT_PASSWORD=changeme
-MONGO_APP_PASSWORD=changeme
-REDIS_PASSWORD=changeme
-JWT_SECRET=changeme-at-least-32-chars
-JWT_REFRESH_SECRET=changeme-at-least-32-chars
-NEXTCLOUD_ADMIN_PASSWORD=changeme
-DOVECOT_INTERNAL_SECRET=changeme
-```
-
----
-
-## Step 3 — DNS Records
-
-Add these records at your DNS provider. All A records point to your **public IP** (the one your router NATs from).
-
-```
-# Mail
-MX    yourdomain.com               mail.yourdomain.com    priority 10
-A     mail.yourdomain.com          YOUR_PUBLIC_IP
-A     cloud.yourdomain.com         YOUR_PUBLIC_IP
-A     office.yourdomain.com        YOUR_PUBLIC_IP
-
-# SPF — allow only your mail server to send
-TXT   yourdomain.com               "v=spf1 mx a:mail.yourdomain.com -all"
-
-# DMARC
-TXT   _dmarc.yourdomain.com        "v=DMARC1; p=quarantine; rua=mailto:admin@yourdomain.com"
-
-# DKIM — key is printed at the end of setup-primary.sh
-TXT   mail._domainkey.yourdomain.com   "v=DKIM1; k=rsa; p=<YOUR_PUBLIC_KEY>"
-```
-
-> DKIM: run `setup-primary.sh` first — it prints the exact TXT record value at the end.
-
----
-
-## Step 4 — Bootstrap Pi-1 (Primary)
-
-SSH into Pi-1 and run:
-
+Then seed the superadmin:
 ```bash
-sudo bash scripts/setup-primary.sh
-```
-
-This installs Docker, GlusterFS, Keepalived (as MASTER), generates a DKIM key, and starts all services.
-
-At the end it prints your **DKIM public key** — add that to DNS now.
-
----
-
-## Step 5 — Bootstrap Pi-2 (Secondary)
-
-SSH into Pi-2 and run:
-
-```bash
-sudo bash scripts/setup-secondary.sh
-```
-
-This installs the same stack but configures Keepalived as BACKUP (it takes over only when Pi-1 is down).
-
----
-
-## Step 6 — Set Up Shared Storage (GlusterFS)
-
-On Pi-1:
-
-```bash
-gluster peer probe 192.168.1.11   # Use Pi-2's actual IP
-sudo bash scripts/setup-glusterfs.sh
-```
-
-This creates replicated volumes for `/gluster/mail`, `/gluster/nextcloud`, and `/gluster/ssl` — everything stays in sync between both Pis automatically.
-
----
-
-## Step 7 — Initialize MongoDB Replica Set
-
-On Pi-1:
-
-```bash
-sudo bash scripts/setup-mongodb-rs.sh
-```
-
-Connects to both MongoDB instances and initializes the replica set so the database is replicated.
-
----
-
-## Step 8 — Get SSL Certificates
-
-```bash
-sudo bash scripts/setup-certificates.sh
-```
-
-Uses Certbot to get Let's Encrypt certs for `mail.yourdomain.com`, `cloud.yourdomain.com`, and `office.yourdomain.com`. Certs are stored in the shared GlusterFS volume so both Pis use the same cert.
-
----
-
-## Step 9 — Start All Services
-
-Run on **both Pis**:
-
-```bash
-docker compose up -d
-docker compose -f docker-compose.apps.yml up -d
-```
-
-Wait ~2 minutes for ClamAV to load its signatures on first start.
-
-Check everything is running:
-
-```bash
-bash scripts/health-check.sh
-```
-
----
-
-## Step 10 — Create the Super Admin Account
-
-Run **once** after the stack is up:
-
-```bash
-SUPERADMIN_EMAIL=superadmin@yourdomain.com \
-SUPERADMIN_PASS=YourSecurePassword123! \
+SUPERADMIN_EMAIL=superadmin@localhost \
+SUPERADMIN_PASS=ChangeMe123! \
 bash scripts/seed-superadmin.sh
 ```
 
-This creates the first superadmin account in MongoDB. Keep these credentials safe — this account can manage all companies.
+---
+
+## Environment Variables Reference
+
+### Backend (Render)
+
+| Variable | Required | Description |
+|---|---|---|
+| `MONGO_URI` | Yes | MongoDB Atlas connection string |
+| `JWT_SECRET` | Yes | Min 32 chars — signs access tokens |
+| `JWT_REFRESH_SECRET` | Yes | Min 32 chars — signs refresh tokens |
+| `CORS_ORIGIN` | Yes | Your Vercel frontend URL |
+| `NODE_ENV` | Yes | Set to `production` |
+| `MAIL_DOMAIN` | No | Default domain label (cosmetic) |
+| `IMAP_HOST` | No | Leave blank — disables mail routes gracefully |
+| `SMTP_HOST` | No | Leave blank |
+| `NEXTCLOUD_URL` | No | Leave blank — disables files/contacts/personal calendar |
+
+### Frontend (Vercel)
+
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_API_URL` | Yes | Your Render backend URL (no trailing slash) |
 
 ---
 
-## Step 11 — Enable Office Suite (Collabora)
+## Deploying Updates
+
+Push to the `vercel-deploy` branch → both Vercel and Render auto-redeploy:
 
 ```bash
-docker exec mailserver-nextcloud php occ app:install richdocuments
-docker exec mailserver-nextcloud php occ config:app:set richdocuments wopi_url \
-  --value="https://office.yourdomain.com"
-```
-
-After this, users can open `.docx`, `.xlsx`, `.pptx` files directly in the browser from Nextcloud Files.
-
----
-
-## Using the System
-
-### As Super Admin
-
-1. Log in at `https://mail.yourdomain.com` with your superadmin credentials
-2. You land on the **Tenants** page automatically
-3. Click **New Tenant** to create a company:
-   - Enter company name and domain (e.g. `acme.com`)
-   - Set the admin's email address (must be `@acme.com`)
-   - Set a password for the admin account
-   - Set **Max Users** (how many email accounts this company can have)
-   - Set **Storage per User** in MB (e.g. 512 MB, 1024 MB = 1 GB)
-4. The company admin can now log in and start creating users
-
-To edit limits or deactivate a company later, click the edit (pencil) or toggle button on the Tenants page.
-
----
-
-### As Company Admin
-
-1. Log in at `https://mail.yourdomain.com` with your admin credentials
-2. You land on the **Users** page automatically
-3. Click **New User** to create an email account:
-   - Enter the username (local part only — e.g. `john`, email becomes `john@yourdomain.com`)
-   - Set a password (user can change it later)
-   - Optionally set a display name and mailbox quota
-4. The user can now log in and use email, calendar, files, and office
-
-The **Users** page shows total users, active users, and remaining slots from your quota.
-
----
-
-### As a Regular User
-
-Log in at `https://mail.yourdomain.com` and you get:
-
-| Section | What you can do |
-|---|---|
-| **Mail** | Read, compose, reply, forward email. Folders in the sidebar (Inbox, Sent, Drafts, Spam, Trash). |
-| **Calendar** | Personal calendar (synced with Nextcloud CalDAV). Switch to **Team Calendar** to see and add company-wide events. |
-| **Contacts** | CardDAV contacts synced with Nextcloud. |
-| **Files** | Upload, download, organize files. Open documents, spreadsheets, and presentations in-browser with Collabora (LibreOffice). |
-
-**Team Calendar:** Anyone in your company can add events. Only the event creator, company admin, or superadmin can delete events. Events are scoped to your company — other companies cannot see them.
-
----
-
-## Email Client Setup (Outlook, Thunderbird, Apple Mail)
-
-| Protocol | Server | Port | Security |
-|---|---|---|---|
-| IMAP (incoming) | mail.yourdomain.com | 993 | SSL/TLS |
-| SMTP (outgoing) | mail.yourdomain.com | 587 | STARTTLS |
-| CalDAV (calendar) | cloud.yourdomain.com | 443 | SSL |
-| CardDAV (contacts) | cloud.yourdomain.com | 443 | SSL |
-
-Username is the full email address. Password is the account password.
-
----
-
-## Accessing Your Services
-
-| Service | URL |
-|---|---|
-| Webmail + Admin panels | `https://mail.yourdomain.com` |
-| Nextcloud (Files / Calendar / Contacts / Office) | `https://cloud.yourdomain.com` |
-| Collabora Online | Embedded inside Nextcloud |
-| HAProxy Stats | `http://PI_IP:8404/stats` |
-
----
-
-## Monitoring & Maintenance
-
-```bash
-# Check all services are healthy
-bash scripts/health-check.sh
-
-# Continuous monitoring with email/Slack alerts
-nohup bash scripts/monitor.sh &
-
-# Backup mail data and database
-bash scripts/backup.sh
-
-# View mail server logs
-docker logs mailserver-postfix
-docker logs mailserver-dovecot
-docker logs mailserver-api
-
-# Check MongoDB replica set status
-docker exec mailserver-mongodb mongosh --eval "rs.status()"
-
-# Check spam filter stats
-docker exec mailserver-rspamd rspamc stat
+git checkout vercel-deploy
+# make changes
+git add . && git commit -m "your message"
+git push origin vercel-deploy
 ```
 
 ---
 
-## Failover Testing
+## Switching to Full Self-Hosted (Pi) Later
 
-```bash
-# Simulate Pi-1 failure
-sudo systemctl stop keepalived docker
-
-# On Pi-2 — verify it grabbed the Virtual IP
-ip addr show | grep 192.168.1.100    # Should appear here
-
-# Restore Pi-1
-sudo systemctl start docker keepalived
-# Pi-1 automatically reclaims MASTER role (~2 seconds)
-```
-
----
-
-## Raspberry Pi 4 Resource Usage (Approximate)
-
-| Service | RAM |
-|---|---|
-| Postfix + Dovecot | 80 MB |
-| Rspamd | 150 MB |
-| ClamAV | 400 MB |
-| Redis | 30 MB |
-| MongoDB | 200 MB |
-| Node API | 100 MB |
-| Nextcloud | 200 MB |
-| Collabora Online | ~1.5 GB |
-| Nginx + HAProxy | 30 MB |
-| **Total** | **~2.7 GB** |
-
-Pi 4 4 GB works. Pi 4 8 GB recommended if multiple users edit documents simultaneously.
+When you have hardware:
+1. Switch to the `main` branch
+2. Follow the full setup guide in `main`'s README
+3. All your MongoDB data (tenants, users) migrates by exporting from Atlas and importing to your self-hosted MongoDB
 
 ---
 
@@ -388,80 +254,19 @@ Pi 4 4 GB works. Pi 4 8 GB recommended if multiple users edit documents simultan
 
 ```
 MailServer/
-├── docker-compose.yml              # Core mail stack (Postfix, Dovecot, MongoDB, Redis, Rspamd, ClamAV)
-├── docker-compose.apps.yml         # App layer (API, webmail, Nextcloud, Collabora, Nginx, HAProxy)
-├── .env.example                    # Config template — copy to .env and fill in
-├── config/
-│   ├── postfix/                    # SMTP config, virtual domains/users/aliases
-│   ├── dovecot/                    # IMAP config, checkpassword auth
-│   ├── rspamd/                     # Spam filter + DKIM signing
-│   ├── nginx/                      # Reverse proxy with SSL
-│   ├── haproxy/                    # TCP proxy for SMTP/IMAP ports
-│   ├── keepalived/                 # VRRP HA config (master + backup)
-│   └── mongodb/                    # Replica set init script
-├── docker/
-│   ├── postfix/                    # ARM64 Postfix Dockerfile
-│   └── dovecot/                    # ARM64 Dovecot Dockerfile + checkpassword.sh
-├── backend/                        # Node.js / Express / TypeScript REST API
+├── vercel-deploy branch
+│   ├── frontend/vercel.json        # Vercel build config
+│   ├── render.yaml                 # Render.com backend config
+│   ├── docker-compose.dev.yml      # Local dev (MongoDB only, no mail stack)
+│   └── .env.cloud.example          # Cloud env var template
+├── backend/                        # Node.js API — deployed to Render
 │   └── src/
-│       ├── models/                 # Mongoose models: User, Domain, Tenant, SharedEvent
-│       ├── routes/                 # auth, mail, calendar, contacts, files, admin, tenants, internal
-│       ├── middleware/             # requireAuth, requireRole, requireSameTenant
-│       └── services/              # authService, imapService, smtpService, nextcloudService
-├── frontend/                       # React + TypeScript + Tailwind webmail UI
-│   └── src/
-│       ├── pages/
-│       │   ├── Login.tsx           # Gmail-style two-step login
-│       │   ├── Inbox.tsx           # 3-pane mail view
-│       │   ├── Calendar.tsx        # Personal + Team calendar tabs
-│       │   ├── Contacts.tsx
-│       │   ├── Files.tsx
-│       │   ├── superadmin/         # Tenants page + Create/Edit modals
-│       │   └── admin/              # Users page + Create/Edit modals
-│       ├── components/
-│       │   ├── Layout/             # Sidebar (role-conditional nav), Header, Layout
-│       │   └── Mail/               # InboxList, MessageView, ComposeModal, FolderTree
-│       └── api/                    # authApi, mailApi, adminApi, superadminApi, sharedCalendarApi
-└── scripts/
-    ├── setup-primary.sh            # Bootstrap Pi-1
-    ├── setup-secondary.sh          # Bootstrap Pi-2
-    ├── setup-glusterfs.sh          # Create replicated GlusterFS volumes
-    ├── setup-mongodb-rs.sh         # Initialize MongoDB Replica Set
-    ├── setup-certificates.sh       # Get Let's Encrypt SSL certs
-    ├── seed-superadmin.sh          # Create the first superadmin account (run once)
-    ├── add-mail-user.sh            # CLI: add a mail user
-    ├── health-check.sh             # Check all services
-    ├── monitor.sh                  # Continuous monitoring + alerts
-    └── backup.sh                   # Backup mail data + DB
+│       ├── routes/                 # mail/contacts/files return 503 if not configured
+│       ├── models/                 # User, Tenant, SharedEvent (all work with Atlas)
+│       └── config/index.ts         # IMAP/SMTP/Nextcloud default to blank (optional)
+└── frontend/                       # React/Vite — deployed to Vercel
+    └── src/
+        ├── pages/superadmin/       # Tenant management (fully works)
+        ├── pages/admin/            # User management (fully works)
+        └── pages/Calendar.tsx      # Team Calendar tab (fully works)
 ```
-
----
-
-## What Was Built
-
-### Mail Stack (`docker-compose.yml`)
-- **Postfix** — SMTP server with virtual mailboxes, SASL auth via Dovecot, Rspamd milter
-- **Dovecot** — IMAP/POP3 + LMTP delivery + Sieve filtering, auth via checkpassword → API → MongoDB
-- **Rspamd** — Spam filter with Bayesian learning (Redis-backed) + DKIM signing
-- **ClamAV** — Antivirus scanning integrated with Postfix milter
-- **MongoDB** — Primary database (users, tenants, shared events) with Replica Set
-- **Redis** — Rspamd cache
-
-### Application Layer (`docker-compose.apps.yml`)
-- **Node.js API** — JWT auth (access + refresh tokens), IMAP proxy, SMTP proxy, CalDAV/CardDAV/WebDAV proxy to Nextcloud, internal Dovecot auth endpoint
-- **React Webmail** — Gmail-like 3-pane inbox, compose, folder tree, calendar, contacts, files
-- **Nextcloud + Collabora Online** — Office suite (LibreOffice Docs/Sheets/Slides in the browser), Calendar, Contacts, Files
-- **Nginx** — SSL reverse proxy for all web services
-- **HAProxy** — TCP proxy for SMTP/IMAP across both Pis
-
-### High Availability
-- **Keepalived** — VRRP Virtual IP: Pi-1 is MASTER (priority 200), Pi-2 is BACKUP (priority 100). Failover in ~2 seconds
-- **GlusterFS** — 2-way replicated filesystem for mail data, Nextcloud files, SSL certs
-- **MongoDB Replica Set** — Synchronous replication with automatic primary election
-
-### Multi-Tenant System
-- **Three roles**: superadmin, admin (company admin), user
-- **Tenants page** (superadmin): create companies, set max users + storage limits, activate/deactivate
-- **Users page** (admin): create/edit/deactivate users within own company only
-- **Strict isolation**: `requireSameTenant()` middleware + domain-filtered DB queries (double enforcement)
-- **Shared Team Calendar**: MongoDB-backed, scoped to tenant domain, visible to all company users

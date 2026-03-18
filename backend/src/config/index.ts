@@ -12,12 +12,12 @@ const envSchema = z.object({
   REDIS_PORT:            z.coerce.number().default(6379),
   REDIS_PASS:            z.string().optional(),
 
-  // IMAP
-  IMAP_HOST:             z.string().default("dovecot"),
+  // IMAP — leave blank in cloud/demo deployments without Dovecot
+  IMAP_HOST:             z.string().default(""),
   IMAP_PORT:             z.coerce.number().default(993),
 
-  // SMTP
-  SMTP_HOST:             z.string().default("postfix"),
+  // SMTP — leave blank in cloud/demo deployments without Postfix
+  SMTP_HOST:             z.string().default(""),
   SMTP_PORT:             z.coerce.number().default(587),
 
   // JWT
@@ -29,8 +29,8 @@ const envSchema = z.object({
   // Internal auth token (for Dovecot checkpassword → API)
   INTERNAL_AUTH_TOKEN:   z.string().min(16).default("change-me-internal-secret"),
 
-  // Nextcloud
-  NEXTCLOUD_URL:              z.string().default("http://nextcloud"),
+  // Nextcloud — leave blank in cloud/demo deployments
+  NEXTCLOUD_URL:              z.string().default(""),
   NEXTCLOUD_ADMIN_USER:       z.string().default("admin"),
   NEXTCLOUD_ADMIN_PASSWORD:   z.string().default("changeme"),
 

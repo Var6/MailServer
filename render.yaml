@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: mailserver-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # ── Required — set these in Render dashboard ───────────────────────────
+      - key: MONGO_URI
+        sync: false           # paste your Atlas connection string
+      - key: JWT_SECRET
+        generateValue: true   # Render auto-generates a secure random value
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false           # paste your Vercel frontend URL, e.g. https://mailserver.vercel.app
+      # ── Optional — leave blank if you don't have a mail server ─────────────
+      - key: IMAP_HOST
+        value: ""
+      - key: SMTP_HOST
+        value: ""
+      - key: NEXTCLOUD_URL
+        value: ""
+      - key: INTERNAL_AUTH_TOKEN
+        generateValue: true
+      - key: MAIL_DOMAIN
+        value: yourdomain.com
