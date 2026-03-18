@@ -11,7 +11,7 @@ import {
 const router = Router();
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email:    z.string().email(),
   password: z.string().min(1),
 });
 
@@ -35,7 +35,15 @@ router.post("/login", async (req, res, next) => {
       path: "/auth/refresh",
     });
 
-    res.json({ accessToken, user: { email: user.email } });
+    res.json({
+      accessToken,
+      user: {
+        email: user.email,
+        role:  user.role,
+        domain: user.domain,
+        displayName: user.displayName,
+      },
+    });
   } catch (e) {
     next(e);
   }
@@ -51,7 +59,10 @@ router.post("/refresh", async (req, res, next) => {
     const user = await getUserByEmail(sub);
     if (!user) { res.status(401).json({ error: "User not found" }); return; }
 
-    res.json({ accessToken: issueAccessToken(user) });
+    res.json({
+      accessToken: issueAccessToken(user),
+      user: { email: user.email, role: user.role, domain: user.domain },
+    });
   } catch {
     res.status(401).json({ error: "Invalid refresh token" });
   }

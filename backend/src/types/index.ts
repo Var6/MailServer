@@ -1,13 +1,11 @@
-export interface MailUser {
-  id: number;
-  email: string;
-  domain_id: number;
-  quota_mb: number;
-}
+import type { UserRole } from "../models/User.js";
+
+export type { UserRole };
 
 export interface AuthTokenPayload {
-  sub: string;   // email
+  sub: string;       // email
   domain: string;
+  role: UserRole;
   iat?: number;
   exp?: number;
 }

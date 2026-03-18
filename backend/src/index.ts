@@ -12,6 +12,8 @@ import calendarRouter from "./routes/calendar.js";
 import contactsRouter from "./routes/contacts.js";
 import filesRouter    from "./routes/files.js";
 import internalRouter from "./routes/internal.js";
+import tenantRouter   from "./routes/tenants.js";
+import adminRouter    from "./routes/adminPanel.js";
 
 const app = express();
 
@@ -42,7 +44,9 @@ app.use("/mail",      mailRouter);
 app.use("/calendar",  calendarRouter);
 app.use("/contacts",  contactsRouter);
 app.use("/files",     filesRouter);
-app.use("/internal",  internalRouter);   // Not exposed via Nginx (internal Docker network only)
+app.use("/internal",  internalRouter);   // Not exposed via Nginx
+app.use("/tenants",   tenantRouter);     // Superadmin: manage companies
+app.use("/admin",     adminRouter);      // Admin: manage own company users
 
 // ── Error handler ─────────────────────────────────────────
 app.use(errorHandler);

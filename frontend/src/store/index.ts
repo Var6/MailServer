@@ -1,11 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type UserRole = "superadmin" | "admin" | "user";
+
 // ── Auth Store ────────────────────────────────────────────
 interface AuthState {
   accessToken: string | null;
   email: string | null;
-  setAuth: (token: string, email: string) => void;
+  role: UserRole | null;
+  domain: string | null;
+  displayName: string | null;
+  setAuth: (token: string, user: { email: string; role: UserRole; domain: string; displayName?: string }) => void;
   clearAuth: () => void;
 }
 
@@ -14,8 +19,17 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       accessToken: null,
       email: null,
-      setAuth: (accessToken, email) => set({ accessToken, email }),
-      clearAuth: () => set({ accessToken: null, email: null }),
+      role: null,
+      domain: null,
+      displayName: null,
+      setAuth: (accessToken, user) => set({
+        accessToken,
+        email: user.email,
+        role: user.role,
+        domain: user.domain,
+        displayName: user.displayName ?? null,
+      }),
+      clearAuth: () => set({ accessToken: null, email: null, role: null, domain: null, displayName: null }),
     }),
     { name: "auth" }
   )
