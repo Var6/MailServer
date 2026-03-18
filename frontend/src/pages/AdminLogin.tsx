@@ -16,10 +16,8 @@ export default function AdminLoginPage() {
   const [step, setStep]         = useState<"email" | "password">("email");
 
   useEffect(() => {
-    if (!accessToken) return;
-    if (role === "superadmin") nav("/superadmin/tenants", { replace: true });
-    else if (role === "admin")  nav("/admin/users", { replace: true });
-    else nav("/inbox", { replace: true }); // shouldn't happen
+    if (!accessToken || role !== "admin") return;
+    nav("/admin/users", { replace: true });
   }, [accessToken, role, nav]);
 
   const handleEmailNext = (e: React.FormEvent) => {
@@ -35,8 +33,13 @@ export default function AdminLoginPage() {
     setLoading(true);
     try {
       const { accessToken, user } = await login(email, password);
+      if (user.role === "superadmin") {
+        setError("Super Admins have their own portal. Please use the Super Admin Portal.");
+        setLoading(false);
+        return;
+      }
       if (user.role === "user") {
-        setError("This portal is for admins only. Please use the user login.");
+        setError("This portal is for Company Admins only. Users, please use the User Portal.");
         setLoading(false);
         return;
       }
@@ -141,11 +144,17 @@ export default function AdminLoginPage() {
           </form>
         )}
 
-        <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+        <div className="mt-6 pt-5 border-t border-gray-100 text-center space-y-2">
+          <p className="text-xs text-[#5f6368]">
+            Super Admin?{" "}
+            <Link to="/superadmin/login" className="text-purple-600 hover:underline font-medium">
+              Super Admin Portal →
+            </Link>
+          </p>
           <p className="text-xs text-[#5f6368]">
             Regular user?{" "}
             <Link to="/login" className="text-blue-600 hover:underline font-medium">
-              Sign in to your mailbox →
+              User Portal →
             </Link>
           </p>
         </div>

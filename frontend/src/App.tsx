@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore, type UserRole } from "./store/index.ts";
 import LoginPage      from "./pages/Login.tsx";
-import AdminLoginPage from "./pages/AdminLogin.tsx";
+import AdminLoginPage      from "./pages/AdminLogin.tsx";
+import SuperAdminLoginPage from "./pages/SuperAdminLogin.tsx";
 import InboxPage      from "./pages/Inbox.tsx";
 import CalendarPage   from "./pages/Calendar.tsx";
 import ContactsPage   from "./pages/Contacts.tsx";
@@ -34,7 +35,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin/login"      element={<AdminLoginPage />} />
+        <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
         <Route
           path="/"
           element={

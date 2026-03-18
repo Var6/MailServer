@@ -4,6 +4,20 @@ A fully self-hosted workspace stack running on 2 Raspberry Pi 4s with automatic 
 
 ---
 
+## Login Portals
+
+Three separate login portals — each role has its own dedicated URL and UI:
+
+| Portal | URL | Who it's for | Theme |
+|---|---|---|---|
+| **User Portal** | `/login` | Regular email users | Blue (Gmail-like) |
+| **Admin Portal** | `/admin/login` | Company Admins | Indigo |
+| **Super Admin Portal** | `/superadmin/login` | Super Admins (system-wide) | Dark Purple |
+
+Each portal enforces role checks — if the wrong role tries to log in, they see a clear error with a link to the correct portal.
+
+---
+
 ## What's Included
 
 | Feature | Technology |
@@ -13,6 +27,7 @@ A fully self-hosted workspace stack running on 2 Raspberry Pi 4s with automatic 
 | Antivirus | ClamAV |
 | DKIM signing | Rspamd |
 | Webmail UI | React + TypeScript (Gmail-like) |
+| Rich text email compose | Tiptap editor (bold, italic, underline, lists, alignment, links, undo/redo) |
 | REST API | Node.js + Express + TypeScript |
 | Documents / Sheets / Slides | Nextcloud + Collabora Online (LibreOffice — free & open source) |
 | Calendar | Personal (Nextcloud CalDAV) + Shared Team Calendar |
@@ -24,6 +39,7 @@ A fully self-hosted workspace stack running on 2 Raspberry Pi 4s with automatic 
 | Load balancing | HAProxy |
 | Containerization | Docker Compose |
 | Multi-tenant | Super Admin → Company Admins → Users with strict data isolation |
+| Billing | Per-tenant billing with outstanding/paid/overdue tracking |
 
 ---
 
@@ -60,14 +76,14 @@ Three roles with strict data isolation:
 
 | Role | Can Do |
 |---|---|
-| **Super Admin** | Create/edit/deactivate companies (tenants); set max users and storage limits per company |
+| **Super Admin** | Create/edit/deactivate companies (tenants); set max users and storage limits per company; manage billing and send invoices to tenants |
 | **Admin** (Company Admin) | Create/edit/deactivate users within their own company only; cannot see other companies |
-| **User** | Send/receive email, personal calendar, shared team calendar, contacts, files |
+| **User** | Send/receive email with rich text compose, personal calendar, shared team calendar, contacts, files |
 
 **Data isolation rules:**
 - Admin A can never see, list, or modify Admin B's users — enforced at both middleware and DB query level
 - `tenantDomain` on shared calendar events is always set server-side from the JWT, never from client input
-- Admin user creation always forces email to `localPart@admin's-domain` — client cannot override the domain
+- Admin can log in with any email address (not required to match the company domain) — the `tenantDomain` is explicitly set server-side at account creation
 
 ---
 
@@ -238,6 +254,8 @@ bash scripts/seed-superadmin.sh
 
 This creates the first superadmin account in MongoDB. Keep these credentials safe — this account can manage all companies.
 
+The superadmin logs in at **`/superadmin/login`** — not the regular user login.
+
 ---
 
 ## Step 11 — Enable Office Suite (Collabora)
@@ -254,48 +272,63 @@ After this, users can open `.docx`, `.xlsx`, `.pptx` files directly in the brows
 
 ## Using the System
 
-### As Super Admin
+### As Super Admin — `/superadmin/login`
 
-1. Log in at `https://mail.yourdomain.com` with your superadmin credentials
-2. You land on the **Tenants** page automatically
-3. Click **New Tenant** to create a company:
-   - Enter company name and domain (e.g. `acme.com`)
-   - Set the admin's email address (must be `@acme.com`)
-   - Set a password for the admin account
-   - Set **Max Users** (how many email accounts this company can have)
-   - Set **Storage per User** in MB (e.g. 512 MB, 1024 MB = 1 GB)
-4. The company admin can now log in and start creating users
+The Super Admin portal has a distinctive dark purple theme so it's immediately obvious which portal you're in.
 
-To edit limits or deactivate a company later, click the edit (pencil) or toggle button on the Tenants page.
-
----
-
-### As Company Admin
-
-1. Log in at `https://mail.yourdomain.com` with your admin credentials
-2. You land on the **Users** page automatically
-3. Click **New User** to create an email account:
-   - Enter the username (local part only — e.g. `john`, email becomes `john@yourdomain.com`)
-   - Set a password (user can change it later)
-   - Optionally set a display name and mailbox quota
-4. The user can now log in and use email, calendar, files, and office
-
-The **Users** page shows total users, active users, and remaining slots from your quota.
+1. Log in at `https://mail.yourdomain.com/superadmin/login`
+2. You land on **Tenants** — a list of all companies on the system
+3. **Create a new company** (New Tenant):
+   - Company name and mail domain (e.g. `acme.com`)
+   - Admin login email (can be any email — gmail, personal, etc.)
+   - Admin password
+   - Max user accounts and storage per mailbox
+4. **Edit a tenant** — adjust user limits, storage, activate/deactivate
+5. **Billing** — create invoices per tenant, track outstanding/paid/overdue amounts, mark bills as paid
 
 ---
 
-### As a Regular User
+### As Company Admin — `/admin/login`
 
-Log in at `https://mail.yourdomain.com` and you get:
+1. Log in at `https://mail.yourdomain.com/admin/login`
+2. You land on **Users** — all accounts in your company
+3. **Create users** — set username, password, display name, and mailbox quota
+4. **Edit users** — change quota, activate/deactivate accounts
+5. The stats bar shows total users, active users, and remaining slots from your quota
+
+---
+
+### As a Regular User — `/login`
+
+1. Log in at `https://mail.yourdomain.com/login`
+2. You get the full Gmail-like webmail interface:
 
 | Section | What you can do |
 |---|---|
-| **Mail** | Read, compose, reply, forward email. Folders in the sidebar (Inbox, Sent, Drafts, Spam, Trash). |
-| **Calendar** | Personal calendar (synced with Nextcloud CalDAV). Switch to **Team Calendar** to see and add company-wide events. |
+| **Mail** | Read, compose (with rich text formatting), reply, forward. Folders in the sidebar: Inbox, Sent, Drafts, Spam, Trash, Archive. |
+| **Calendar** | Personal calendar (Nextcloud CalDAV). Switch to **Team Calendar** to see and add company-wide events. |
 | **Contacts** | CardDAV contacts synced with Nextcloud. |
 | **Files** | Upload, download, organize files. Open documents, spreadsheets, and presentations in-browser with Collabora (LibreOffice). |
 
-**Team Calendar:** Anyone in your company can add events. Only the event creator, company admin, or superadmin can delete events. Events are scoped to your company — other companies cannot see them.
+#### Rich Text Compose
+
+The compose window has a full formatting toolbar:
+
+| Button | Action |
+|---|---|
+| **B** | Bold |
+| *I* | Italic |
+| U | Underline |
+| S | Strikethrough |
+| H2 | Heading |
+| — | Bullet list |
+| 1. | Numbered list |
+| Align | Left / Center / Right |
+| Link | Insert / edit hyperlink |
+| Undo / Redo | History navigation |
+| Clear | Remove all formatting |
+
+Emails are sent as real HTML so recipients see the formatting in any mail client.
 
 ---
 
@@ -316,7 +349,9 @@ Username is the full email address. Password is the account password.
 
 | Service | URL |
 |---|---|
-| Webmail + Admin panels | `https://mail.yourdomain.com` |
+| **User login** (webmail) | `https://mail.yourdomain.com/login` |
+| **Admin login** | `https://mail.yourdomain.com/admin/login` |
+| **Super Admin login** | `https://mail.yourdomain.com/superadmin/login` |
 | Nextcloud (Files / Calendar / Contacts / Office) | `https://cloud.yourdomain.com` |
 | Collabora Online | Embedded inside Nextcloud |
 | HAProxy Stats | `http://PI_IP:8404/stats` |
@@ -404,24 +439,26 @@ MailServer/
 │   └── dovecot/                    # ARM64 Dovecot Dockerfile + checkpassword.sh
 ├── backend/                        # Node.js / Express / TypeScript REST API
 │   └── src/
-│       ├── models/                 # Mongoose models: User, Domain, Tenant, SharedEvent
-│       ├── routes/                 # auth, mail, calendar, contacts, files, admin, tenants, internal
+│       ├── models/                 # Mongoose models: User, Domain, Tenant, SharedEvent, Bill
+│       ├── routes/                 # auth, mail, calendar, contacts, files, admin, tenants, billing, internal
 │       ├── middleware/             # requireAuth, requireRole, requireSameTenant
 │       └── services/              # authService, imapService, smtpService, nextcloudService
 ├── frontend/                       # React + TypeScript + Tailwind webmail UI
 │   └── src/
 │       ├── pages/
-│       │   ├── Login.tsx           # Gmail-style two-step login
+│       │   ├── Login.tsx           # User portal — blue theme
+│       │   ├── AdminLogin.tsx      # Company admin portal — indigo theme
+│       │   ├── SuperAdminLogin.tsx # Super admin portal — dark purple theme
 │       │   ├── Inbox.tsx           # 3-pane mail view
 │       │   ├── Calendar.tsx        # Personal + Team calendar tabs
 │       │   ├── Contacts.tsx
 │       │   ├── Files.tsx
-│       │   ├── superadmin/         # Tenants page + Create/Edit modals
+│       │   ├── superadmin/         # Tenants, Billing pages + modals
 │       │   └── admin/              # Users page + Create/Edit modals
 │       ├── components/
 │       │   ├── Layout/             # Sidebar (role-conditional nav), Header, Layout
-│       │   └── Mail/               # InboxList, MessageView, ComposeModal, FolderTree
-│       └── api/                    # authApi, mailApi, adminApi, superadminApi, sharedCalendarApi
+│       │   └── Mail/               # InboxList, MessageView, ComposeModal (Tiptap), FolderTree
+│       └── api/                    # authApi, mailApi, adminApi, superadminApi, billingApi, sharedCalendarApi
 └── scripts/
     ├── setup-primary.sh            # Bootstrap Pi-1
     ├── setup-secondary.sh          # Bootstrap Pi-2
@@ -444,12 +481,12 @@ MailServer/
 - **Dovecot** — IMAP/POP3 + LMTP delivery + Sieve filtering, auth via checkpassword → API → MongoDB
 - **Rspamd** — Spam filter with Bayesian learning (Redis-backed) + DKIM signing
 - **ClamAV** — Antivirus scanning integrated with Postfix milter
-- **MongoDB** — Primary database (users, tenants, shared events) with Replica Set
+- **MongoDB** — Primary database (users, tenants, shared events, bills) with Replica Set
 - **Redis** — Rspamd cache
 
 ### Application Layer (`docker-compose.apps.yml`)
-- **Node.js API** — JWT auth (access + refresh tokens), IMAP proxy, SMTP proxy, CalDAV/CardDAV/WebDAV proxy to Nextcloud, internal Dovecot auth endpoint
-- **React Webmail** — Gmail-like 3-pane inbox, compose, folder tree, calendar, contacts, files
+- **Node.js API** — JWT auth (access + refresh tokens), IMAP proxy, SMTP proxy, CalDAV/CardDAV/WebDAV proxy to Nextcloud, internal Dovecot auth endpoint, billing CRUD
+- **React Webmail** — Gmail-like 3-pane inbox; Tiptap rich text compose; folder tree; calendar; contacts; files; three separate role-specific login portals
 - **Nextcloud + Collabora Online** — Office suite (LibreOffice Docs/Sheets/Slides in the browser), Calendar, Contacts, Files
 - **Nginx** — SSL reverse proxy for all web services
 - **HAProxy** — TCP proxy for SMTP/IMAP across both Pis
@@ -460,8 +497,15 @@ MailServer/
 - **MongoDB Replica Set** — Synchronous replication with automatic primary election
 
 ### Multi-Tenant System
-- **Three roles**: superadmin, admin (company admin), user
+- **Three roles**: superadmin, admin (company admin), user — each with a dedicated login portal
 - **Tenants page** (superadmin): create companies, set max users + storage limits, activate/deactivate
+- **Billing page** (superadmin): per-tenant invoices with outstanding/paid/overdue status; global stats
 - **Users page** (admin): create/edit/deactivate users within own company only
 - **Strict isolation**: `requireSameTenant()` middleware + domain-filtered DB queries (double enforcement)
-- **Shared Team Calendar**: MongoDB-backed, scoped to tenant domain, visible to all company users
+- **Admin email flexibility**: admins can log in with any email address — `tenantDomain` is set server-side at creation
+
+### Rich Text Email Compose
+- **Tiptap editor** — ProseMirror-based open source rich text editor
+- **Formatting**: bold, italic, underline, strikethrough, heading, bullet list, ordered list, left/center/right align, hyperlink insertion
+- **History**: undo, redo, clear all formatting
+- **Output**: real HTML email sent to recipients; plain text fallback auto-generated
