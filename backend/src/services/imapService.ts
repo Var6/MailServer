@@ -1,4 +1,5 @@
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 import { config } from "../config/index.js";
 import type { MailFolder, MailHeader, MailMessage, PaginatedMessages } from "../types/index.js";
 
@@ -28,27 +29,31 @@ async function getClient(email: string, password: string): Promise<ImapFlow> {
     secure: true,
     auth: { user: email, pass: password },
     logger: false,
-    tls: { rejectUnauthorized: false },  // set to true in production with valid cert
+    tls: { rejectUnauthorized: false },
   });
   await client.connect();
   pool.set(email, { client, lastUsed: Date.now() });
   return client;
 }
 
+// Helper: parse address object from imapflow into "Name <email>" string
+function fmtAddr(a: { name?: string; address?: string } | undefined): string {
+  if (!a) return "";
+  const addr = a.address ?? "";
+  return a.name ? `${a.name} <${addr}>` : addr;
+}
+
 export async function listFolders(email: string, password: string): Promise<MailFolder[]> {
   const client = await getClient(email, password);
-  const folders: MailFolder[] = [];
-  for await (const mailbox of client.list()) {
-    folders.push({
-      path: mailbox.path,
-      name: mailbox.name,
-      delimiter: mailbox.delimiter ?? "/",
-      flags: Array.from(mailbox.flags ?? []),
-      specialUse: mailbox.specialUse,
-      subscribed: mailbox.subscribed ?? false,
-    });
-  }
-  return folders;
+  const list = await client.list();   // returns Promise<ListResponse[]>
+  return list.map(mailbox => ({
+    path: mailbox.path,
+    name: mailbox.name,
+    delimiter: mailbox.delimiter ?? "/",
+    flags: Array.from(mailbox.flags ?? []),
+    specialUse: mailbox.specialUse,
+    subscribed: mailbox.subscribed ?? false,
+  }));
 }
 
 export async function fetchMessages(
@@ -68,26 +73,22 @@ export async function fetchMessages(
       return { messages: [], total: 0, page, limit, folder };
     }
 
-    // Calculate UID range for pagination (newest first)
     const start = Math.max(1, total - (page * limit) + 1);
     const end   = Math.max(1, total - ((page - 1) * limit));
     const range = `${start}:${end}`;
 
     const messages: MailHeader[] = [];
     for await (const msg of client.fetch(range, {
-      uid: true,
-      flags: true,
-      envelope: true,
-      bodyStructure: true,
-      size: true,
+      uid: true, flags: true, envelope: true, bodyStructure: true, size: true,
     })) {
-      const from = msg.envelope?.from?.[0];
+      const from = (msg.envelope?.from as Array<{ name?: string; address?: string }>)?.[0];
+      const toList = (msg.envelope?.to as Array<{ name?: string; address?: string }>) ?? [];
       messages.push({
         uid: msg.uid,
         seq: msg.seq,
         flags: Array.from(msg.flags ?? []),
-        from: from ? `${from.name ?? ""} <${from.mailbox}@${from.host}>`.trim() : "",
-        to: (msg.envelope?.to ?? []).map(a => `${a.mailbox}@${a.host}`).join(", "),
+        from: fmtAddr(from),
+        to: toList.map(a => a.address ?? "").join(", "),
         subject: msg.envelope?.subject ?? "(no subject)",
         date: msg.envelope?.date ?? new Date(),
         size: msg.size ?? 0,
@@ -115,22 +116,17 @@ export async function fetchMessage(
   try {
     const msgs: MailMessage[] = [];
     for await (const msg of client.fetch({ uid }, {
-      uid: true,
-      flags: true,
-      envelope: true,
-      bodyStructure: true,
-      source: true,
-      size: true,
+      uid: true, flags: true, envelope: true, bodyStructure: true, source: true, size: true,
     })) {
-      const { simpleParser } = await import("mailparser");
       const parsed = await simpleParser(msg.source ?? Buffer.alloc(0));
-      const from = msg.envelope?.from?.[0];
+      const from = (msg.envelope?.from as Array<{ name?: string; address?: string }>)?.[0];
+      const toList = (msg.envelope?.to as Array<{ name?: string; address?: string }>) ?? [];
       msgs.push({
         uid: msg.uid,
         seq: msg.seq,
         flags: Array.from(msg.flags ?? []),
-        from: from ? `${from.name ?? ""} <${from.mailbox}@${from.host}>`.trim() : "",
-        to: (msg.envelope?.to ?? []).map(a => `${a.mailbox}@${a.host}`).join(", "),
+        from: fmtAddr(from),
+        to: toList.map(a => a.address ?? "").join(", "),
         subject: msg.envelope?.subject ?? "(no subject)",
         date: msg.envelope?.date ?? new Date(),
         size: msg.size ?? 0,
@@ -138,8 +134,8 @@ export async function fetchMessage(
         answered: (msg.flags ?? new Set()).has("\\Answered"),
         flagged: (msg.flags ?? new Set()).has("\\Flagged"),
         hasAttachments: (parsed.attachments?.length ?? 0) > 0,
-        html: parsed.html || undefined,
-        text: parsed.text || undefined,
+        html: typeof parsed.html === "string" ? parsed.html : undefined,
+        text: parsed.text ?? undefined,
         attachments: (parsed.attachments ?? []).map(a => ({
           filename: a.filename ?? "attachment",
           contentType: a.contentType,
@@ -150,7 +146,6 @@ export async function fetchMessage(
     }
 
     if (msgs.length) {
-      // Mark as seen
       await client.messageFlagsAdd({ uid }, ["\\Seen"], { uid: true });
     }
 

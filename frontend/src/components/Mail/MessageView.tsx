@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Reply, Forward, Trash2, Star, MoreVertical,
-  Paperclip, ChevronDown, ExternalLink, Print, Archive,
+  Paperclip, ChevronDown, ExternalLink, Printer, Archive,
   CornerUpLeft
 } from "lucide-react";
 import { getMessage, flagMessage, deleteMessage, moveMessage } from "../../api/mailApi.ts";
@@ -126,7 +126,7 @@ export default function MessageView() {
               onMouseLeave={() => setMenuOpen(false)}
             >
               <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
-                <Print size={14} /> Print
+                <Printer size={14} /> Print
               </button>
               <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
                 <ExternalLink size={14} /> Open in new window
