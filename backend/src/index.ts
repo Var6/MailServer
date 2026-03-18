@@ -14,6 +14,7 @@ import filesRouter    from "./routes/files.js";
 import internalRouter from "./routes/internal.js";
 import tenantRouter   from "./routes/tenants.js";
 import adminRouter    from "./routes/adminPanel.js";
+import billingRouter  from "./routes/billing.js";
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/files",     filesRouter);
 app.use("/internal",  internalRouter);   // Not exposed via Nginx
 app.use("/tenants",   tenantRouter);     // Superadmin: manage companies
 app.use("/admin",     adminRouter);      // Admin: manage own company users
+app.use("/billing",   billingRouter);   // Superadmin: billing management
 
 // ── Error handler ─────────────────────────────────────────
 app.use(errorHandler);

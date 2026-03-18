@@ -6,6 +6,7 @@ import CalendarPage   from "./pages/Calendar.tsx";
 import ContactsPage   from "./pages/Contacts.tsx";
 import FilesPage      from "./pages/Files.tsx";
 import TenantsPage    from "./pages/superadmin/Tenants.tsx";
+import BillingPage    from "./pages/superadmin/Billing.tsx";
 import AdminUsersPage from "./pages/admin/Users.tsx";
 import Layout         from "./components/Layout/Layout.tsx";
 
@@ -59,6 +60,11 @@ export default function App() {
           <Route path="superadmin/tenants" element={
             <RequireRole roles={["superadmin"]}>
               <TenantsPage />
+            </RequireRole>
+          } />
+          <Route path="superadmin/billing" element={
+            <RequireRole roles={["superadmin"]}>
+              <BillingPage />
             </RequireRole>
           } />
         </Route>
