@@ -2,36 +2,38 @@ version: "3.9"
 
 # ============================================================
 #  MailServer — Core Mail Stack
-#  docker-compose.yml
+#  docker-compose.yml  (Windows / single-server edition)
+#
+#  HA components removed: GlusterFS, Keepalived, MongoDB
+#  replica-set flags, keyfile auth, and HAProxy are all gone.
+#  Data lives in named Docker volumes — no host-path coupling.
 # ============================================================
 
 networks:
   mailnet:
     driver: bridge
-    driver_opts:
-      com.docker.network.driver.mtu: "1450"
 
 volumes:
-  redis_data:
-  clamav_db:
-  dkim_keys:
   mongodb_data:
+  redis_data:
+  mail_data:
+  cert_data:
+  dkim_keys:
+  clamav_db:
 
 services:
 
-  # ── MongoDB (Replica Set member) ─────────────────────────
+  # ── MongoDB (standalone) ──────────────────────────────────
   mongodb:
     image: mongo:7
     container_name: mailserver-mongodb
     restart: unless-stopped
-    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongodb/keyfile
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: mailserver
     volumes:
-      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/mongodb:/data/db
-      - ./config/mongodb/keyfile:/etc/mongodb/keyfile:ro
+      - mongodb_data:/data/db
       - ./config/mongodb/initdb.js:/docker-entrypoint-initdb.d/initdb.js:ro
     ports:
       - "27017:27017"
@@ -43,7 +45,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis (Rspamd + Session cache) ───────────────────────
+  # ── Redis (Rspamd + session cache) ───────────────────────
   redis:
     image: redis:7-alpine
     container_name: mailserver-redis
@@ -71,8 +73,8 @@ services:
     env_file: .env
     hostname: ${MAIL_HOSTNAME}
     volumes:
-      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/vhosts:/var/mail/vhosts
-      - ${GLUSTER_CERTS_PATH:-/gluster/certs}:/etc/ssl/mailserver:ro
+      - mail_data:/var/mail/vhosts
+      - cert_data:/etc/ssl/mailserver:ro
       - dkim_keys:/etc/opendkim/keys
       - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
@@ -102,8 +104,8 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ${GLUSTER_MAIL_PATH:-/gluster/mail}/vhosts:/var/mail/vhosts
-      - ${GLUSTER_CERTS_PATH:-/gluster/certs}:/etc/ssl/mailserver:ro
+      - mail_data:/var/mail/vhosts
+      - cert_data:/etc/ssl/mailserver:ro
       - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
       - ./config/dovecot/conf.d:/etc/dovecot/conf.d:ro
     ports:
@@ -118,7 +120,7 @@ services:
     networks:
       - mailnet
 
-  # ── Rspamd (Spam filter + DKIM) ───────────────────────────
+  # ── Rspamd (spam filter + DKIM signing) ───────────────────
   rspamd:
     image: rspamd/rspamd:latest
     container_name: mailserver-rspamd
@@ -133,7 +135,7 @@ services:
     networks:
       - mailnet
 
-  # ── ClamAV (Antivirus) ────────────────────────────────────
+  # ── ClamAV (antivirus) ────────────────────────────────────
   clamav:
     image: clamav/clamav:latest
     container_name: mailserver-clamav

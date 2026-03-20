@@ -1,5 +1,5 @@
 # ============================================================
-#  Postfix — ARM64-compatible Docker image
+#  Postfix — Docker image (amd64 / x86_64)
 # ============================================================
 FROM debian:bookworm-slim
 
