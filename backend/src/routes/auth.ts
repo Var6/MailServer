@@ -32,7 +32,7 @@ router.post("/login", async (req, res, next) => {
       secure: true,
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/auth/refresh",
+      path: "/",
     });
 
     res.json({
@@ -70,7 +70,7 @@ router.post("/refresh", async (req, res, next) => {
 
 // POST /auth/logout
 router.post("/logout", (_req, res) => {
-  res.clearCookie("refresh_token", { path: "/auth/refresh" });
+  res.clearCookie("refresh_token", { path: "/" });
   res.json({ ok: true });
 });
 

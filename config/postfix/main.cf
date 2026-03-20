@@ -1,10 +1,11 @@
 # ============================================================
 #  Postfix main.cf — Virtual Mailbox + Rspamd + Dovecot SASL
+#  (Local demo — TLS disabled, TCP sockets for inter-container)
 # ============================================================
 
 # --- Basic Identity ---
-myhostname = mail.yourdomain.com       # Override via env or entrypoint script
-mydomain   = yourdomain.com
+myhostname = localhost
+mydomain   = localhost
 myorigin   = $mydomain
 inet_interfaces = all
 inet_protocols  = ipv4
@@ -16,56 +17,37 @@ local_recipient_maps =
 
 # --- Virtual Mailbox ---
 # Domains and mailboxes are looked up in real-time via the Node.js TCP map
-# server (port 10023).  New tenants are accepted immediately — no restart needed.
 virtual_mailbox_domains   = tcp:api:10023
 virtual_mailbox_maps      = tcp:api:10023
-virtual_transport         = lmtp:unix:private/dovecot-lmtp
+virtual_transport         = lmtp:inet:dovecot:24
 virtual_mailbox_base      = /var/mail/vhosts
 
-# --- SMTP AUTH (delegated to Dovecot SASL) ---
+# --- SMTP AUTH (Dovecot SASL via TCP) ---
 smtpd_sasl_type           = dovecot
-smtpd_sasl_path           = private/auth
+smtpd_sasl_path           = inet:dovecot:12
 smtpd_sasl_auth_enable    = yes
 smtpd_sasl_security_options = noanonymous
 smtpd_sasl_local_domain   = $myhostname
 broken_sasl_auth_clients  = yes
 
-# --- TLS ---
-smtpd_tls_cert_file       = /etc/ssl/mailserver/fullchain.pem
-smtpd_tls_key_file        = /etc/ssl/mailserver/privkey.pem
-smtpd_tls_CAfile          = /etc/ssl/mailserver/chain.pem
-smtpd_use_tls             = yes
-smtpd_tls_auth_only       = yes
-smtpd_tls_security_level  = may
-smtpd_tls_loglevel        = 1
-smtpd_tls_received_header = yes
-smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
-
-smtp_tls_cert_file        = /etc/ssl/mailserver/fullchain.pem
-smtp_tls_key_file         = /etc/ssl/mailserver/privkey.pem
-smtp_tls_CAfile           = /etc/ssl/mailserver/chain.pem
-smtp_tls_security_level   = may
-smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+# --- TLS disabled for local demo ---
+smtpd_use_tls             = no
+smtp_tls_security_level   = none
 
 # --- Restrictions ---
 smtpd_helo_required       = yes
 smtpd_helo_restrictions   =
     permit_mynetworks,
-    reject_invalid_helo_hostname,
-    reject_non_fqdn_helo_hostname
+    permit_sasl_authenticated
 
 smtpd_recipient_restrictions =
     permit_mynetworks,
     permit_sasl_authenticated,
-    reject_non_fqdn_recipient,
-    reject_unknown_recipient_domain,
     reject_unauth_destination
 
 smtpd_sender_restrictions =
     permit_mynetworks,
-    permit_sasl_authenticated,
-    reject_non_fqdn_sender,
-    reject_unknown_sender_domain
+    permit_sasl_authenticated
 
 smtpd_relay_restrictions  =
     permit_mynetworks,
@@ -73,7 +55,6 @@ smtpd_relay_restrictions  =
     reject_unauth_destination
 
 # --- Sender login map (prevent spoofing) ---
-# Authenticated users may only send from their own address.
 smtpd_sender_login_maps   = pcre:/etc/postfix/sender_login_pcre
 
 # --- Milters (Rspamd) ---
@@ -85,7 +66,7 @@ milter_protocol           = 6
 # --- Queue & Timeouts ---
 maximal_queue_lifetime    = 5d
 bounce_queue_lifetime     = 1d
-message_size_limit        = 52428800    # 50 MB
+message_size_limit        = 52428800
 
 # --- Misc ---
 biff                      = no

@@ -12,11 +12,9 @@ version: "3.9"
 
 networks:
   mailnet:
-    external: true
 
 volumes:
   cert_data:
-    external: true          # shared with docker-compose.yml
   nextcloud_data:
   nextcloud_html:
 
@@ -50,6 +48,8 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
       MAIL_DOMAIN: ${MAIL_DOMAIN}
+    ports:
+      - "127.0.0.1:3001:3000"   # localhost only — used by start.bat for first-run setup
     depends_on:
       - mongodb
       - redis
@@ -77,14 +77,14 @@ services:
 
   # ── Nextcloud (Files / Calendar / Contacts / Office) ──────
   nextcloud:
-    image: nextcloud:27-fpm-alpine
+    image: nextcloud:28-apache
     container_name: mailserver-nextcloud
     restart: unless-stopped
     environment:
       SQLITE_DATABASE: nextcloud
       NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
       NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
-      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:-mail.yourdomain.com localhost}
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:-localhost}
       REDIS_HOST: redis
       REDIS_HOST_PASSWORD: ${REDIS_PASSWORD}
     volumes:
@@ -104,9 +104,10 @@ services:
     cap_add:
       - MKNOD
     environment:
-      domain: ${MAIL_HOSTNAME}
+      domain: ".*"                # accept requests from ANY domain (multi-tenant)
       extra_params: --o:ssl.enable=false --o:ssl.termination=true
       DONT_GEN_SSL_CERT: "YES"
+      server_name: ${SERVER_URL:-https://localhost}
     networks:
       - mailnet
     deploy:
@@ -120,8 +121,9 @@ services:
     container_name: mailserver-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:8080"
+      - "8082:8082"
+      - "8443:8443"
     volumes:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
@@ -170,6 +172,7 @@ services:
   #  service out if you are using the tunnel.
   # ─────────────────────────────────────────────────────────
   certbot:
+    profiles: ["ssl"]
     image: certbot/certbot:latest
     container_name: mailserver-certbot
     volumes:

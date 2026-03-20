@@ -15,7 +15,7 @@ function createTransport(user: string, pass: string) {
     host,
     port,
     secure: false,
-    requireTLS: true,
+    requireTLS: false,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });

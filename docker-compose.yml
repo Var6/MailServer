@@ -32,6 +32,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: mailserver
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
     volumes:
       - mongodb_data:/data/db
       - ./config/mongodb/initdb.js:/docker-entrypoint-initdb.d/initdb.js:ro
@@ -76,7 +77,7 @@ services:
       - mail_data:/var/mail/vhosts
       - cert_data:/etc/ssl/mailserver:ro
       - dkim_keys:/etc/opendkim/keys
-      - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
+      - ./config/postfix/main.cf:/etc/postfix/main.cf
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
       - ./config/postfix/virtual_mailbox_pcre:/etc/postfix/virtual_mailbox_pcre:ro
       - ./config/postfix/sender_login_pcre:/etc/postfix/sender_login_pcre:ro
