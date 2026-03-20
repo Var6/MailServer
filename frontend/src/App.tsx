@@ -1,13 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore, type UserRole } from "./store/index.ts";
-import LoginPage      from "./pages/Login.tsx";
-import InboxPage      from "./pages/Inbox.tsx";
-import CalendarPage   from "./pages/Calendar.tsx";
-import ContactsPage   from "./pages/Contacts.tsx";
-import FilesPage      from "./pages/Files.tsx";
-import TenantsPage    from "./pages/superadmin/Tenants.tsx";
-import AdminUsersPage from "./pages/admin/Users.tsx";
-import Layout         from "./components/Layout/Layout.tsx";
+import LandingPage         from "./pages/LandingPage.tsx";
+import LoginPage           from "./pages/Login.tsx";
+import AdminLoginPage      from "./pages/AdminLogin.tsx";
+import SuperAdminLoginPage from "./pages/SuperAdminLogin.tsx";
+import InboxPage           from "./pages/Inbox.tsx";
+import CalendarPage        from "./pages/Calendar.tsx";
+import ContactsPage        from "./pages/Contacts.tsx";
+import FilesPage           from "./pages/Files.tsx";
+import TenantsPage         from "./pages/superadmin/Tenants.tsx";
+import BillingPage         from "./pages/superadmin/Billing.tsx";
+import AdminUsersPage      from "./pages/admin/Users.tsx";
+import Layout              from "./components/Layout/Layout.tsx";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = useAuthStore(s => s.accessToken);
@@ -20,28 +24,26 @@ function RequireRole({ roles, children }: { roles: UserRole[]; children: JSX.Ele
   return children;
 }
 
-function RoleHome() {
-  const role = useAuthStore(s => s.role);
-  if (role === "superadmin") return <Navigate to="/superadmin/tenants" replace />;
-  if (role === "admin")      return <Navigate to="/admin/users" replace />;
-  return <Navigate to="/inbox" replace />;
-}
-
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        {/* Public landing page */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Auth pages */}
+        <Route path="/login"            element={<LoginPage />} />
+        <Route path="/admin/login"      element={<AdminLoginPage />} />
+        <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
+
+        {/* Protected app routes — pathless layout route */}
         <Route
-          path="/"
           element={
             <RequireAuth>
               <Layout />
             </RequireAuth>
           }
         >
-          <Route index element={<RoleHome />} />
-
           {/* Regular user routes */}
           <Route path="inbox"    element={<InboxPage />} />
           <Route path="calendar" element={<CalendarPage />} />
@@ -49,18 +51,32 @@ export default function App() {
           <Route path="files"    element={<FilesPage />} />
 
           {/* Admin routes */}
-          <Route path="admin/users" element={
-            <RequireRole roles={["admin", "superadmin"]}>
-              <AdminUsersPage />
-            </RequireRole>
-          } />
+          <Route
+            path="admin/users"
+            element={
+              <RequireRole roles={["admin", "superadmin"]}>
+                <AdminUsersPage />
+              </RequireRole>
+            }
+          />
 
           {/* Super-admin routes */}
-          <Route path="superadmin/tenants" element={
-            <RequireRole roles={["superadmin"]}>
-              <TenantsPage />
-            </RequireRole>
-          } />
+          <Route
+            path="superadmin/tenants"
+            element={
+              <RequireRole roles={["superadmin"]}>
+                <TenantsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="superadmin/billing"
+            element={
+              <RequireRole roles={["superadmin"]}>
+                <BillingPage />
+              </RequireRole>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>

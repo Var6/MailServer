@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Mail, Calendar, Users, Folder, LogOut, Inbox, Send,
   AlertTriangle, Trash2, Archive, FileText, ChevronDown, ChevronRight,
-  PenSquare, Building2, UserCog
+  PenSquare, Building2, UserCog, Receipt
 } from "lucide-react";
 import { useAuthStore, useMailStore } from "../../store/index.ts";
 import { logout } from "../../api/authApi.ts";
@@ -27,6 +27,7 @@ const ADMIN_NAV = [
 
 const SUPERADMIN_NAV = [
   { to: "/superadmin/tenants", icon: Building2, label: "Tenants" },
+  { to: "/superadmin/billing", icon: Receipt,   label: "Billing" },
 ];
 
 const SPECIAL_MAP: Record<string, { icon: typeof Inbox; label: string; order: number }> = {

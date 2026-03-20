@@ -1,16 +1,12 @@
 #!/bin/bash
 set -e
 
-# Substitute placeholder passwords in mysql config files with real env vars
-for f in /etc/postfix/mysql-*.cf; do
-  sed -i "s/MYSQL_PASSWORD_PLACEHOLDER/${MYSQL_PASSWORD}/g" "$f"
-done
+# ── 1. Set hostname & domain ────────────────────────────────────────────────
+postconf -e "myhostname = ${MAIL_HOSTNAME:-mail.localhost}"
+postconf -e "mydomain   = ${MAIL_DOMAIN:-localhost}"
 
-# Set hostname
-postconf -e "myhostname = ${MAIL_HOSTNAME}"
-postconf -e "mydomain = ${MAIL_DOMAIN}"
-
-# Ensure Postfix queue dirs are correct
+# ── 2. Postfix sanity check ──────────────────────────────────────────────────
 postfix check
 
+# ── 3. Start Postfix ─────────────────────────────────────────────────────────
 exec "$@"

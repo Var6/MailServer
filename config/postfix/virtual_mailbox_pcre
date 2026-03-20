@@ -1,0 +1,4 @@
+# Accept any user at any virtual domain.
+# Dovecot LMTP will reject the delivery (5xx) if the user doesn't actually exist,
+# which causes Postfix to bounce the message — no need to duplicate the user list here.
+/^(.+)@(.+)$/   $2/$1/Maildir/

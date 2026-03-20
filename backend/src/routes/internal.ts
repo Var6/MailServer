@@ -6,6 +6,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { verifyCredentials, domainExists, getUserByEmail, createUser } from "../services/authService.js";
+import { Domain } from "../models/User.js";
 
 const router = Router();
 
@@ -51,6 +52,14 @@ router.get("/virtual-user", async (req, res, next) => {
     const user = await getUserByEmail(req.query.email as string);
     if (user) res.json({ exists: true, email: user.email });
     else res.status(404).json({ exists: false });
+  } catch (e) { next(e); }
+});
+
+// GET /internal/domains — list all active domains (used by Postfix entrypoint to build maps)
+router.get("/domains", async (_req, res, next) => {
+  try {
+    const domains = await Domain.find({ active: true }).select("name -_id");
+    res.json(domains.map(d => d.name));
   } catch (e) { next(e); }
 });
 

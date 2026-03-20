@@ -14,6 +14,8 @@ import filesRouter    from "./routes/files.js";
 import internalRouter from "./routes/internal.js";
 import tenantRouter   from "./routes/tenants.js";
 import adminRouter    from "./routes/adminPanel.js";
+import billingRouter  from "./routes/billing.js";
+import { startPostfixTcpMap } from "./services/postfixTcpMap.js";
 
 const app = express();
 
@@ -47,6 +49,7 @@ app.use("/files",     filesRouter);
 app.use("/internal",  internalRouter);   // Not exposed via Nginx
 app.use("/tenants",   tenantRouter);     // Superadmin: manage companies
 app.use("/admin",     adminRouter);      // Admin: manage own company users
+app.use("/billing",   billingRouter);   // Superadmin: billing management
 
 // ── Error handler ─────────────────────────────────────────
 app.use(errorHandler);
@@ -59,6 +62,8 @@ async function start() {
       socketTimeoutMS: 30000,
     });
     console.log("[db] MongoDB connected");
+
+    startPostfixTcpMap(10023);
 
     app.listen(config.PORT, () => {
       console.log(`[api] Listening on :${config.PORT} (${config.NODE_ENV})`);
