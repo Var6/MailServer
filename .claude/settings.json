@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/.gitattributes\":*)",
+      "Bash(docker compose:*)",
+      "Bash(xargs file:*)",
+      "Bash(xargs sed:*)",
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/config/dovecot/conf.d/10-master.conf\":*)",
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/docker/postfix/entrypoint.sh\":*)",
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/config/dovecot/conf.d/10-ssl.conf\":*)",
+      "Bash(__NEW_LINE_f2809883325d4626__ cat:*)",
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/config/dovecot/conf.d/15-mailboxes.conf\":*)",
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/config/postfix/main.cf\":*)",
+      "Bash(docker volume:*)",
+      "Bash(docker run --rm -v mail_cert_data:/certs alpine sh -c \":*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Ashish\\Desktop\\Language prop\\Mail"
+    ]
+  }
+}

@@ -12,11 +12,9 @@ version: "3.9"
 
 networks:
   mailnet:
-    external: true
 
 volumes:
   cert_data:
-    external: true          # shared with docker-compose.yml
   nextcloud_data:
   nextcloud_html:
 
@@ -149,6 +147,7 @@ services:
   #  forwarding from your router.
   # ─────────────────────────────────────────────────────────
   cloudflared:
+    profiles: ["tunnel"]
     image: cloudflare/cloudflared:latest
     container_name: mailserver-cloudflared
     restart: unless-stopped
@@ -170,6 +169,7 @@ services:
   #  service out if you are using the tunnel.
   # ─────────────────────────────────────────────────────────
   certbot:
+    profiles: ["ssl"]
     image: certbot/certbot:latest
     container_name: mailserver-certbot
     volumes:
