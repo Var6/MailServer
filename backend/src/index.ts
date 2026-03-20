@@ -15,6 +15,7 @@ import internalRouter from "./routes/internal.js";
 import tenantRouter   from "./routes/tenants.js";
 import adminRouter    from "./routes/adminPanel.js";
 import billingRouter  from "./routes/billing.js";
+import setupRouter    from "./routes/setup.js";
 import { startPostfixTcpMap } from "./services/postfixTcpMap.js";
 
 const app = express();
@@ -50,6 +51,7 @@ app.use("/internal",  internalRouter);   // Not exposed via Nginx
 app.use("/tenants",   tenantRouter);     // Superadmin: manage companies
 app.use("/admin",     adminRouter);      // Admin: manage own company users
 app.use("/billing",   billingRouter);   // Superadmin: billing management
+app.use("/setup",     setupRouter);     // First-run: create superadmin (no-op after)
 
 // ── Error handler ─────────────────────────────────────────
 app.use(errorHandler);

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/.env\":*)",
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/start.bat\":*)"
+    ]
+  }
+}
