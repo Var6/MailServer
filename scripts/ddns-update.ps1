@@ -1,49 +1,45 @@
-# ============================================================
-#  DuckDNS Auto-Update Script
-#  Runs every 5 minutes via Windows Task Scheduler.
-#  Updates your DuckDNS subdomain whenever your public IP changes.
-# ============================================================
-
 param(
-  [string]$Token    = $env:DUCKDNS_TOKEN,
+  [string]$Token     = $env:DUCKDNS_TOKEN,
   [string]$Subdomain = $env:DUCKDNS_SUBDOMAIN
 )
 
-$stateFile = "$PSScriptRoot\.ddns_last_ip"
-$logFile   = "$PSScriptRoot\.ddns.log"
+$stateFile = Join-Path $PSScriptRoot ".ddns_last_ip"
+$logFile   = Join-Path $PSScriptRoot ".ddns.log"
 
 function Log($msg) {
   $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-  "$ts  $msg" | Tee-Object -FilePath $logFile -Append | Write-Host
+  $line = "$ts  $msg"
+  Add-Content -Path $logFile -Value $line
+  Write-Host $line
 }
 
 if (-not $Token -or -not $Subdomain) {
-  Log "ERROR: DUCKDNS_TOKEN and DUCKDNS_SUBDOMAIN must be set in .env or passed as parameters."
+  Log "ERROR: DUCKDNS_TOKEN and DUCKDNS_SUBDOMAIN must be set"
   exit 1
 }
 
-# Get current public IP
 try {
   $currentIp = (Invoke-RestMethod -Uri "https://api.ipify.org" -TimeoutSec 10).Trim()
 } catch {
-  Log "ERROR: Could not get public IP — no internet? $_"
+  Log "ERROR: Could not get public IP: $_"
   exit 1
 }
 
-# Read last known IP
-$lastIp = if (Test-Path $stateFile) { Get-Content $stateFile -Raw | ForEach-Object { $_.Trim() } } else { "" }
+$lastIp = ""
+if (Test-Path $stateFile) {
+  $lastIp = (Get-Content $stateFile -Raw).Trim()
+}
 
 if ($currentIp -eq $lastIp) {
-  # IP unchanged — silent exit
   exit 0
 }
 
-# IP changed — update DuckDNS
-Log "IP changed: $lastIp -> $currentIp — updating DuckDNS ($Subdomain.duckdns.org)..."
-try {
-  $url    = "https://www.duckdns.org/update?domains=$Subdomain&token=$Token&ip=$currentIp"
-  $result = (Invoke-RestMethod -Uri $url -TimeoutSec 10).Trim()
+Log "IP changed: $lastIp -> $currentIp -- updating DuckDNS..."
 
+try {
+  $amp = [char]38
+  $url = "https://www.duckdns.org/update?domains=" + $Subdomain + $amp + "token=" + $Token + $amp + "ip=" + $currentIp
+  $result = (Invoke-RestMethod -Uri $url -TimeoutSec 10).Trim()
   if ($result -eq "OK") {
     Set-Content -Path $stateFile -Value $currentIp
     Log "SUCCESS: $Subdomain.duckdns.org now points to $currentIp"
@@ -52,6 +48,6 @@ try {
     exit 1
   }
 } catch {
-  Log "ERROR: DuckDNS update failed — $_"
+  Log "ERROR: DuckDNS update failed: $_"
   exit 1
 }
