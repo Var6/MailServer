@@ -3,7 +3,8 @@
     "allow": [
       "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/.env\":*)",
       "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/start.bat\":*)",
-      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/scripts/install-ddns-task.bat\":*)"
+      "Bash(\"c:/Users/Ashish/Desktop/Language prop/Mail/scripts/install-ddns-task.bat\":*)",
+      "Bash(docker ps:*)"
     ]
   }
 }
