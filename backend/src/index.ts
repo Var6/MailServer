@@ -15,6 +15,7 @@ import internalRouter from "./routes/internal.js";
 import tenantRouter   from "./routes/tenants.js";
 import adminRouter    from "./routes/adminPanel.js";
 import billingRouter  from "./routes/billing.js";
+import { startPostfixTcpMap } from "./services/postfixTcpMap.js";
 
 const app = express();
 
@@ -61,6 +62,8 @@ async function start() {
       socketTimeoutMS: 30000,
     });
     console.log("[db] MongoDB connected");
+
+    startPostfixTcpMap(10023);
 
     app.listen(config.PORT, () => {
       console.log(`[api] Listening on :${config.PORT} (${config.NODE_ENV})`);

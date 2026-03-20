@@ -23,6 +23,7 @@ volumes:
 services:
 
   # ── Node.js REST API ──────────────────────────────────────
+  # Postfix TCP map listens on 10023 (internal only)
   api:
     build:
       context: ./backend
