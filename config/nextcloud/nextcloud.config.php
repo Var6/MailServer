@@ -6,22 +6,15 @@ $CONFIG = [
   // Accept any domain — multi-tenant, tenants add their own domains
   'trusted_domains' => [
     0 => 'localhost',
-    1 => getenv('SERVER_URL') ?: '223.235.102.35',
-    2 => '*',
+    1 => 'rishabh.tail09a4d0.ts.net',
+    2 => getenv('SERVER_URL') ?: 'localhost',
+    3 => 'nextcloud',
   ],
-  'overwrite.cli.url'  => getenv('SERVER_URL') ?: 'https://localhost',
-  'overwriteprotocol'  => 'https',
-  'htaccess.RewriteBase' => '/',
-
-  // Redis session cache
-  'memcache.local'       => '\OC\Memcache\Redis',
-  'memcache.distributed' => '\OC\Memcache\Redis',
-  'memcache.locking'     => '\OC\Memcache\Redis',
-  'redis' => [
-    'host'     => 'redis',
-    'port'     => 6379,
-    'password' => getenv('REDIS_PASSWORD'),
-  ],
+  'overwrite.cli.url'    => 'https://rishabh.tail09a4d0.ts.net/nextcloud',
+  'overwritewebroot'     => '/nextcloud',
+  'overwriteprotocol'    => 'https',
+  'overwritehost'        => 'rishabh.tail09a4d0.ts.net',
+  'htaccess.RewriteBase' => '/nextcloud',
 
   // Email via local Postfix
   'mail_smtpmode'    => 'smtp',
