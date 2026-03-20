@@ -24,6 +24,11 @@ import threading
 import time
 from pathlib import Path
 
+# ── Force UTF-8 output on Windows ─────────────────────────────────────────────
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ── ANSI colours (Windows 10+ and all Unix) ────────────────────────────────────
 os.system("")
 R    = "\033[91m"; G    = "\033[92m"; Y    = "\033[93m"
