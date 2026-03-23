@@ -32,6 +32,9 @@ async function handleLookup(key: string): Promise<string> {
   if (key.includes("@")) {
     // Mailbox lookup: john@citizenjaivik.com
     const [local, domain] = key.split("@");
+    // Only serve addresses on domains this server hosts — never match external addresses
+    const hostedDomain = await Domain.findOne({ name: domain, active: true });
+    if (!hostedDomain) return "500 not found";
     const user = await getUserByEmail(key);
     if (!user || !user.active) return "500 not found";
     const maildir = `${domain}/${local}/`;

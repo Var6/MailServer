@@ -1,6 +1,5 @@
 # ============================================================
 #  Postfix main.cf — Virtual Mailbox + Rspamd + Dovecot SASL
-#  (Local demo — TLS disabled, TCP sockets for inter-container)
 # ============================================================
 
 # --- Basic Identity ---
@@ -10,15 +9,20 @@ myorigin   = $mydomain
 inet_interfaces = all
 inet_protocols  = ipv4
 
+# --- DNS: use OS resolver so Docker's 127.0.0.11 works ---
+smtp_host_lookup          = native
+
+# --- Logging to stdout (Docker) ---
+maillog_file              = /dev/stdout
+
 # --- Receive ---
 mydestination =
 local_transport = error:local mail delivery is disabled
 local_recipient_maps =
 
 # --- Virtual Mailbox ---
-# Domains and mailboxes are looked up in real-time via the Node.js TCP map
-virtual_mailbox_domains   = tcp:api:10023
-virtual_mailbox_maps      = tcp:api:10023
+virtual_mailbox_domains   = tcp:172.18.0.8:10023
+virtual_mailbox_maps      = tcp:172.18.0.8:10023
 virtual_transport         = lmtp:inet:dovecot:24
 virtual_mailbox_base      = /var/mail/vhosts
 
@@ -30,9 +34,9 @@ smtpd_sasl_security_options = noanonymous
 smtpd_sasl_local_domain   = $myhostname
 broken_sasl_auth_clients  = yes
 
-# --- TLS disabled for local demo ---
+# --- TLS (inbound disabled for local demo) ---
 smtpd_use_tls             = no
-smtp_tls_security_level   = none
+smtp_tls_security_level   = may
 
 # --- Restrictions ---
 smtpd_helo_required       = yes
@@ -74,3 +78,24 @@ append_dot_mydomain       = no
 readme_directory          = no
 compatibility_level       = 3.6
 smtputf8_enable           = no
+
+# ── External relay (injected by entrypoint) ──────────────────────────────────
+relayhost = [smtp-relay.brevo.com]:587
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_tls_security_level = encrypt
+
+# ── External relay (injected by entrypoint) ──────────────────────────────────
+relayhost = [smtp-relay.brevo.com]:587
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_tls_security_level = encrypt
+
+# ── External relay (injected by entrypoint) ──────────────────────────────────
+relayhost = [smtp-relay.brevo.com]:587
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_tls_security_level = encrypt
