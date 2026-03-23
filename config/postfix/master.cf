@@ -23,6 +23,15 @@ smtps     inet  n       -       y       -       -       smtpd
   -o smtpd_client_restrictions=permit_sasl_authenticated,reject
   -o milter_macro_daemon_name=ORIGINATING
 
+# Internal API submission (port 10025) — trusted Docker network, no auth/TLS
+10025     inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/internal
+  -o smtpd_tls_security_level=none
+  -o smtpd_sasl_auth_enable=no
+  -o smtpd_client_restrictions=permit_mynetworks,reject
+  -o smtpd_relay_restrictions=permit_mynetworks,reject
+  -o milter_macro_daemon_name=ORIGINATING
+
 # Pickup, cleanup, qmgr (standard)
 pickup    unix  n       -       y       60      1       pickup
 cleanup   unix  n       -       y       -       0       cleanup

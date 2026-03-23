@@ -2,23 +2,20 @@ import nodemailer from "nodemailer";
 import { config } from "../config/index.js";
 import type { SendMailOptions } from "../types/index.js";
 
-function createTransport(user: string, pass: string) {
+function createTransport(_user: string, _pass: string) {
   const host = config.SMTP_HOST;
-  const port = config.SMTP_PORT;
 
   // Dev mode: if SMTP_HOST is not configured, use Ethereal (fake SMTP — emails viewable at the URL logged below)
   if (!host) {
     return null; // signal to use Ethereal per-send
   }
 
+  // Use internal port 10025 — no TLS or auth needed (trusted Docker network)
   return nodemailer.createTransport({
     host,
-    port,
+    port: 10025,
     secure: false,
-    requireTLS: false,
     ignoreTLS: true,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
   });
 }
 
