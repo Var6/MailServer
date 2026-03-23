@@ -26,7 +26,7 @@ async function getClient(email: string, password: string): Promise<ImapFlow> {
   const client = new ImapFlow({
     host: config.IMAP_HOST,
     port: config.IMAP_PORT,
-    secure: true,
+    secure: false,
     auth: { user: email, pass: password },
     logger: false,
     tls: { rejectUnauthorized: false },
@@ -198,6 +198,31 @@ export async function toggleFlag(
     }
   } finally {
     lock.release();
+  }
+}
+
+export async function appendToSent(
+  email: string,
+  password: string,
+  opts: { from: string; to: string; subject: string; text?: string; html?: string }
+): Promise<void> {
+  const client = await getClient(email, password);
+  const date = new Date().toUTCString();
+  const body = opts.text ?? (opts.html ? opts.html.replace(/<[^>]*>/g, "") : "");
+  const raw = [
+    `From: ${opts.from}`,
+    `To: ${opts.to}`,
+    `Subject: ${opts.subject}`,
+    `Date: ${date}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/plain; charset=utf-8`,
+    ``,
+    body,
+  ].join("\r\n");
+  try {
+    await client.append("Sent", Buffer.from(raw), ["\\Seen"]);
+  } catch {
+    // Non-fatal: don't fail the send if Sent append fails
   }
 }
 

@@ -10,7 +10,7 @@ smtp      inet  n       -       y       -       -       smtpd
 # Submission (port 587) — authenticated client submission
 submission inet n       -       y       -       -       smtpd
   -o syslog_name=postfix/submission
-  -o smtpd_tls_security_level=encrypt
+  -o smtpd_tls_security_level=none
   -o smtpd_sasl_auth_enable=yes
   -o smtpd_client_restrictions=permit_sasl_authenticated,reject
   -o milter_macro_daemon_name=ORIGINATING
@@ -23,12 +23,21 @@ smtps     inet  n       -       y       -       -       smtpd
   -o smtpd_client_restrictions=permit_sasl_authenticated,reject
   -o milter_macro_daemon_name=ORIGINATING
 
+# Internal API submission (port 10025) — trusted Docker network, no auth/TLS
+10025     inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/internal
+  -o smtpd_tls_security_level=none
+  -o smtpd_sasl_auth_enable=no
+  -o smtpd_client_restrictions=permit_mynetworks,reject
+  -o smtpd_relay_restrictions=permit_mynetworks,reject
+  -o milter_macro_daemon_name=ORIGINATING
+
 # Pickup, cleanup, qmgr (standard)
 pickup    unix  n       -       y       60      1       pickup
 cleanup   unix  n       -       y       -       0       cleanup
 qmgr      unix  n       -       n       300     1       qmgr
 tlsmgr    unix  -       -       y       1000?   1       tlsmgr
-rewrite   unix  -       -       y       -       -       trivial-rewrite
+rewrite   unix  -       -       n       -       -       trivial-rewrite
 bounce    unix  -       -       y       -       0       bounce
 defer     unix  -       -       y       -       0       bounce
 trace     unix  -       -       y       -       0       bounce
@@ -36,7 +45,7 @@ verify    unix  -       -       y       -       1       verify
 flush     unix  n       -       y       1000?   0       flush
 proxymap  unix  -       -       n       -       -       proxymap
 proxywrite unix -       -       n       -       1       proxymap
-smtp      unix  -       -       y       -       -       smtp
+smtp      unix  -       -       n       -       -       smtp
 relay     unix  -       -       y       -       -       smtp
 showq     unix  n       -       y       -       -       showq
 error     unix  -       -       y       -       -       error

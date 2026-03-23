@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   Building2,
   User,
-  Crown,
   ArrowRight,
 } from "lucide-react";
 
@@ -20,7 +19,6 @@ function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-16">
-        {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="bg-blue-600 text-white rounded-lg p-1.5">
             <Mail size={20} />
@@ -28,7 +26,6 @@ function Navbar() {
           <span className="text-xl font-bold text-gray-900 tracking-tight">MailServer</span>
         </div>
 
-        {/* Nav links */}
         <div className="flex items-center gap-2">
           <Link
             to="/login"
@@ -38,15 +35,9 @@ function Navbar() {
           </Link>
           <Link
             to="/admin/login"
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
           >
             Admin Portal
-          </Link>
-          <Link
-            to="/superadmin/login"
-            className="px-4 py-2 text-sm font-medium text-white bg-purple-700 hover:bg-purple-800 rounded-lg transition-colors shadow-sm"
-          >
-            Super Admin
           </Link>
         </div>
       </div>
@@ -78,28 +69,15 @@ const portalCards = [
     btnBg: "bg-indigo-600 hover:bg-indigo-700",
     badge: "bg-indigo-100 text-indigo-700",
   },
-  {
-    role: "Super Admin",
-    icon: Crown,
-    description:
-      "Oversee all tenants, set usage limits, manage billing, and monitor system health.",
-    href: "/superadmin/login",
-    gradient: "from-purple-600 to-purple-900",
-    ring: "ring-purple-200",
-    btnBg: "bg-purple-700 hover:bg-purple-800",
-    badge: "bg-purple-100 text-purple-800",
-  },
 ];
 
 function Hero() {
   return (
     <section className="pt-32 pb-20 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative overflow-hidden">
-      {/* Decorative blobs */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-200/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-200/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 relative">
-        {/* Headline */}
         <div className="text-center mb-16">
           <span className="inline-block px-3 py-1 text-xs font-semibold tracking-widest uppercase bg-blue-100 text-blue-700 rounded-full mb-5">
             Open Source · Self-Hosted · Private
@@ -116,8 +94,8 @@ function Hero() {
           </p>
         </div>
 
-        {/* 3-column portal cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* 2-column centered portal cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
           {portalCards.map((card) => {
             const Icon = card.icon;
             return (
@@ -125,14 +103,12 @@ function Hero() {
                 key={card.role}
                 className={`relative bg-white rounded-2xl shadow-xl ring-1 ${card.ring} p-8 flex flex-col hover:shadow-2xl hover:-translate-y-1 transition-all duration-200`}
               >
-                {/* Icon header */}
                 <div
                   className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br ${card.gradient} text-white mb-5 shadow-md`}
                 >
                   <Icon size={22} />
                 </div>
 
-                {/* Badge */}
                 <span
                   className={`self-start text-xs font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-3 ${card.badge}`}
                 >
@@ -192,7 +168,7 @@ const features = [
     icon: Globe,
     title: "LibreOffice Online",
     description:
-      "Edit .docx, .xlsx, and .pptx files directly in the browser via Collabora CODE — enable with VITE_COLLABORA_ENABLED=true.",
+      "Edit .docx, .xlsx, and .pptx files directly in the browser via Collabora CODE — no desktop software needed.",
     color: "text-yellow-600 bg-yellow-50",
   },
   {
@@ -206,7 +182,7 @@ const features = [
     icon: Building2,
     title: "Multi-Tenant",
     description:
-      "Super Admin creates companies. Each Admin manages their own users. Strict data isolation at every layer.",
+      "Each company admin manages their own users. Strict data isolation at every layer.",
     color: "text-indigo-600 bg-indigo-50",
   },
   {
@@ -256,18 +232,6 @@ function Features() {
 // ─── How It Works ─────────────────────────────────────────────────────────────
 const roles = [
   {
-    icon: Crown,
-    label: "Super Admin",
-    color: "from-purple-600 to-purple-900",
-    badge: "bg-purple-100 text-purple-800",
-    steps: [
-      "Create and manage companies (tenants)",
-      "Set storage, user, and API limits per company",
-      "Monitor system health and usage metrics",
-      "Manage billing and subscription plans",
-    ],
-  },
-  {
     icon: Building2,
     label: "Company Admin",
     color: "from-indigo-500 to-indigo-700",
@@ -299,14 +263,14 @@ function HowItWorks() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-            Three roles. One platform.
+            Two roles. One platform.
           </h2>
           <p className="text-lg text-gray-500 max-w-xl mx-auto">
-            Clear separation of responsibilities — from infrastructure to end users.
+            Clear separation of responsibilities — from company admins to end users.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           {roles.map((r) => {
             const Icon = r.icon;
             return (
@@ -375,7 +339,6 @@ function ConnectSection() {
           </p>
         </div>
 
-        {/* Client pills */}
         <div className="flex flex-wrap justify-center gap-3 mb-12">
           {clients.map((c) => (
             <span
@@ -387,7 +350,6 @@ function ConnectSection() {
           ))}
         </div>
 
-        {/* Settings table */}
         <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
           <table className="w-full text-sm">
             <thead>
@@ -475,7 +437,6 @@ function Footer() {
         <div className="flex items-center gap-4 text-gray-500 text-sm">
           <Link to="/login" className="hover:text-white transition-colors">User Portal</Link>
           <Link to="/admin/login" className="hover:text-white transition-colors">Admin Portal</Link>
-          <Link to="/superadmin/login" className="hover:text-white transition-colors">Super Admin</Link>
         </div>
       </div>
     </footer>

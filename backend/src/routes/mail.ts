@@ -51,7 +51,11 @@ const sendSchema = z.object({
 router.post("/send", async (req, res, next) => {
   try {
     const opts = sendSchema.parse(req.body);
-    await sendMail({ ...opts, from: req.user!.sub }, req.userPassword!);
+    const from = req.user!.sub;
+    const password = req.userPassword!;
+    await sendMail({ ...opts, from }, password);
+    const toStr = Array.isArray(opts.to) ? opts.to.join(", ") : opts.to;
+    imap.appendToSent(from, password, { from, to: toStr, subject: opts.subject, text: opts.text, html: opts.html }).catch(() => {});
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
