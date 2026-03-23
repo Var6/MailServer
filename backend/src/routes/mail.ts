@@ -7,6 +7,15 @@ import { sendMail } from "../services/smtpService.js";
 const router = Router();
 router.use(requireAuth);
 
+// In cloud deployments without Dovecot/Postfix, return a clear error
+router.use((_req, res, next) => {
+  if (!process.env.IMAP_HOST) {
+    res.status(503).json({ error: "Mail server not configured in this deployment." });
+    return;
+  }
+  next();
+});
+
 // GET /mail/folders
 router.get("/folders", async (req, res, next) => {
   try {

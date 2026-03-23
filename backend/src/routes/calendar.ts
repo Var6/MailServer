@@ -9,6 +9,10 @@ router.use(requireAuth);
 
 // ── Personal calendar (Nextcloud CalDAV proxy) ────────────
 router.get("/events", async (req, res, next) => {
+  if (!process.env.NEXTCLOUD_URL) {
+    res.json([]);   // return empty — Team Calendar still works
+    return;
+  }
   try {
     const start = (req.query.start as string) || new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     const end   = (req.query.end   as string) || new Date(Date.now() + 30 * 86400000).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
