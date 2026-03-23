@@ -5,12 +5,13 @@
 #  Reads username/password from fd 3, calls API, sets env vars.
 # ============================================================
 
-# Read from file descriptor 3 (Dovecot checkpassword protocol)
-read -d '' -r CREDENTIALS <&3 || true
+# Load env vars (Dovecot auth-worker doesn't inherit parent env)
+# shellcheck source=/dev/null
+[ -f /etc/dovecot/checkpassword.env ] && . /etc/dovecot/checkpassword.env
 
-# Split by NUL byte  (username\0password\0timestamp\0)
-USERNAME=$(echo -n "$CREDENTIALS" | cut -d$'\0' -f1)
-PASSWORD=$(echo -n "$CREDENTIALS" | cut -d$'\0' -f2)
+# Read from file descriptor 3 (Dovecot checkpassword protocol: username\0password\0...)
+IFS= read -r -d '' USERNAME <&3 || true
+IFS= read -r -d '' PASSWORD <&3 || true
 
 API_URL="${INTERNAL_API_URL:-http://api:3000}"
 TOKEN="${INTERNAL_AUTH_TOKEN:-change-me-internal-secret}"
@@ -34,7 +35,7 @@ HOME_DIR=$(echo "$RESPONSE" | grep -oP '"home":"\K[^"]+' || echo "/var/mail/vhos
 
 # Set Dovecot userdb environment variables
 export HOME="$HOME_DIR"
-export EXTRA="userdb_home=$HOME_DIR userdb_uid=5000 userdb_gid=5000 userdb_mail=maildir:$HOME_DIR"
+export EXTRA="uid=5000 gid=5000 home=$HOME_DIR mail=maildir:$HOME_DIR"
 
 # Exec the next program in the chain (usually dovecot-auth-userdb)
 exec "$@"

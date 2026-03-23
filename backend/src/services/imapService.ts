@@ -26,7 +26,7 @@ async function getClient(email: string, password: string): Promise<ImapFlow> {
   const client = new ImapFlow({
     host: config.IMAP_HOST,
     port: config.IMAP_PORT,
-    secure: true,
+    secure: false,
     auth: { user: email, pass: password },
     logger: false,
     tls: { rejectUnauthorized: false },
