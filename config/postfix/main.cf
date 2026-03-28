@@ -24,8 +24,8 @@ local_transport = error:local mail delivery is disabled
 local_recipient_maps =
 
 # --- Virtual Mailbox ---
-virtual_mailbox_domains   = tcp:172.18.0.3:10023
-virtual_mailbox_maps      = tcp:172.18.0.3:10023
+virtual_mailbox_domains   = tcp:172.18.0.9:10023
+virtual_mailbox_maps      = tcp:172.18.0.9:10023
 virtual_transport         = lmtp:inet:dovecot:24
 virtual_mailbox_base      = /var/mail/vhosts
 
