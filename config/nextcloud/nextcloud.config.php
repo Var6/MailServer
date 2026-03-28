@@ -2,18 +2,22 @@
 // ============================================================
 //  Nextcloud Custom Configuration
 // ============================================================
+
+// Strip protocol prefix so trusted_domains contains only the hostname
+$_serverUrl  = getenv('SERVER_URL') ?: 'localhost';
+$_serverHost = preg_replace('#^https?://#', '', rtrim($_serverUrl, '/'));
+
 $CONFIG = [
   // Accept any domain — multi-tenant, tenants add their own domains
   'trusted_domains' => [
     0 => 'localhost',
-    1 => 'rishabh.tail09a4d0.ts.net',
-    2 => getenv('SERVER_URL') ?: 'localhost',
-    3 => 'nextcloud',
+    1 => $_serverHost,
+    2 => 'nextcloud',
   ],
-  'overwrite.cli.url'    => 'https://rishabh.tail09a4d0.ts.net/nextcloud',
+  'overwrite.cli.url'    => $_serverUrl . '/nextcloud',
   'overwritewebroot'     => '/nextcloud',
   'overwriteprotocol'    => 'https',
-  'overwritehost'        => 'rishabh.tail09a4d0.ts.net',
+  'overwritehost'        => $_serverHost,
   'htaccess.RewriteBase' => '/nextcloud',
 
   // Email via local Postfix
