@@ -8,13 +8,7 @@ cp /etc/postfix/main.cf /tmp/main.cf
 sed -i "s|myhostname = .*|myhostname = ${MAIL_HOSTNAME:-mail.localhost}|" /tmp/main.cf
 sed -i "s|mydomain   = .*|mydomain   = ${MAIL_DOMAIN:-localhost}|"        /tmp/main.cf
 
-API_IP=$(getent hosts api 2>/dev/null | awk '{ print $1 }' | head -1)
-if [ -n "$API_IP" ]; then
-  sed -i "s|tcp:[0-9.]*:10023|tcp:${API_IP}:10023|g" /tmp/main.cf
-  echo "Postfix TCP map pointing to API at ${API_IP}:10023"
-else
-  echo "WARNING: Could not resolve 'api' hostname — TCP map IP unchanged"
-fi
+echo "Postfix TCP map using Docker hostname: api:10023"
 
 cp /tmp/main.cf /etc/postfix/main.cf
 
