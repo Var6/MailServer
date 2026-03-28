@@ -1,7 +1,7 @@
 import { Router } from "express";
 import axios from "axios";
 import { requireAuth } from "../middleware/auth.js";
-import { listFiles, uploadFile } from "../services/nextcloudService.js";
+import { listFiles, uploadFile, provisionUser } from "../services/nextcloudService.js";
 import { config } from "../config/index.js";
 
 const router = Router();
@@ -47,8 +47,12 @@ router.use(requireAuth);
 // GET /files?path=/
 router.get("/", async (req, res, next) => {
   try {
-    const path = (req.query.path as string) || "/";
-    const files = await listFiles(req.user!.sub, req.userPassword!, path);
+    const email    = req.user!.sub;
+    const password = req.userPassword!;
+    const path     = (req.query.path as string) || "/";
+    // Ensure NC user exists and password is synced before every WebDAV call
+    await provisionUser(email, password).catch(() => {});
+    const files = await listFiles(email, password, path);
     res.json(files);
   } catch (e) { next(e); }
 });

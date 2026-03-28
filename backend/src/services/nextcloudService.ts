@@ -15,7 +15,7 @@ export async function provisionUser(email: string, password: string): Promise<vo
   const userExists = await axios.get(
     `${ncBase}/ocs/v1.php/cloud/users/${encodeURIComponent(email)}?format=json`,
     { auth: { username: ncAdmin, password: ncAdminPw }, headers: { "OCS-APIRequest": "true" }, validateStatus: () => true }
-  ).then(r => r.status === 200);
+  ).then(r => r.data?.ocs?.meta?.statuscode === 100);
 
   if (!userExists) {
     await axios.post(
@@ -92,29 +92,67 @@ export async function getEvents(
   return resp.data;
 }
 
-export async function listFiles(email: string, password: string, path = "/"): Promise<unknown[]> {
+interface FileEntry {
+  name: string;
+  isDirectory: boolean;
+  contentType: string;
+  size: number;
+}
+
+function parseWebDAV(xml: string, davBasePath: string): FileEntry[] {
+  const files: FileEntry[] = [];
+  const responses = xml.match(/<d:response[\s\S]*?<\/d:response>/g) ?? [];
+
+  for (const block of responses) {
+    const hrefMatch = block.match(/<d:href>([\s\S]*?)<\/d:href>/);
+    if (!hrefMatch) continue;
+
+    const href = decodeURIComponent(hrefMatch[1].trim());
+
+    // Skip the directory itself (href ends with the requested path)
+    const normalized = href.replace(/\/$/, "");
+    const base       = davBasePath.replace(/\/$/, "");
+    if (normalized === base) continue;
+
+    const name = href.split("/").filter(Boolean).pop() ?? "";
+    if (!name) continue;
+
+    const isDirectory = block.includes("<d:collection");
+    const ctMatch     = block.match(/<d:getcontenttype>([\s\S]*?)<\/d:getcontenttype>/);
+    const sizeMatch   = block.match(/<oc:size>([\s\S]*?)<\/oc:size>/);
+
+    files.push({
+      name,
+      isDirectory,
+      contentType: ctMatch ? ctMatch[1].trim() : "",
+      size: sizeMatch ? parseInt(sizeMatch[1].trim(), 10) : 0,
+    });
+  }
+  return files;
+}
+
+export async function listFiles(email: string, password: string, path = "/"): Promise<FileEntry[]> {
   const client = ncClient(email, password);
+  const davPath = `/remote.php/dav/files/${encodeURIComponent(email)}${path}`;
   const resp = await client.request({
     method: "PROPFIND",
-    url: `/remote.php/dav/files/${encodeURIComponent(email)}${path}`,
-    headers: {
-      "Content-Type": "application/xml",
-      Depth: "1",
-    },
+    url: davPath,
+    headers: { "Content-Type": "application/xml", Depth: "1" },
     data: `<?xml version="1.0"?>
 <d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
   <d:prop>
     <d:getlastmodified/>
-    <d:getetag/>
     <d:getcontenttype/>
     <d:resourcetype/>
-    <oc:fileid/>
     <oc:size/>
-    <nc:has-preview/>
   </d:prop>
 </d:propfind>`,
+    responseType: "text",
+    validateStatus: s => s < 500,
   });
-  return resp.data;
+
+  if (resp.status === 404) return [];
+  return parseWebDAV(resp.data as string, davPath);
 }
 
 export async function uploadFile(
@@ -128,6 +166,6 @@ export async function uploadFile(
   await client.put(
     `/remote.php/dav/files/${encodeURIComponent(email)}${path}`,
     content,
-    { headers: { "Content-Type": contentType } }
+    { headers: { "Content-Type": contentType }, responseType: "text" }
   );
 }
