@@ -17,12 +17,7 @@ setInterval(() => {
   }
 }, 60_000);
 
-async function getClient(email: string, password: string): Promise<ImapFlow> {
-  const existing = pool.get(email);
-  if (existing) {
-    existing.lastUsed = Date.now();
-    return existing.client;
-  }
+async function createFreshClient(email: string, password: string): Promise<ImapFlow> {
   const client = new ImapFlow({
     host: config.IMAP_HOST,
     port: config.IMAP_PORT,
@@ -36,6 +31,51 @@ async function getClient(email: string, password: string): Promise<ImapFlow> {
   return client;
 }
 
+async function getClient(email: string, password: string): Promise<ImapFlow> {
+  const existing = pool.get(email);
+  if (existing) {
+    // Check the connection is still alive before reusing it
+    if (existing.client.usable) {
+      existing.lastUsed = Date.now();
+      return existing.client;
+    }
+    // Connection is stale — evict and reconnect
+    pool.delete(email);
+    existing.client.logout().catch(() => {});
+  }
+  return createFreshClient(email, password);
+}
+
+// Wrap any IMAP operation with automatic retry on connection failure
+async function withClient<T>(
+  email: string,
+  password: string,
+  fn: (client: ImapFlow) => Promise<T>
+): Promise<T> {
+  let client = await getClient(email, password);
+  try {
+    return await fn(client);
+  } catch (err: unknown) {
+    // On connection-level errors, evict the broken client and retry once
+    const isConnErr = err instanceof Error && (
+      err.message.includes("connect") ||
+      err.message.includes("socket") ||
+      err.message.includes("ECONNRESET") ||
+      err.message.includes("ETIMEDOUT") ||
+      err.message.includes("closed") ||
+      err.message.includes("Lost connection") ||
+      !client.usable
+    );
+    if (isConnErr) {
+      pool.delete(email);
+      client.logout().catch(() => {});
+      client = await createFreshClient(email, password);
+      return await fn(client);
+    }
+    throw err;
+  }
+}
+
 // Helper: parse address object from imapflow into "Name <email>" string
 function fmtAddr(a: { name?: string; address?: string } | undefined): string {
   if (!a) return "";
@@ -44,16 +84,17 @@ function fmtAddr(a: { name?: string; address?: string } | undefined): string {
 }
 
 export async function listFolders(email: string, password: string): Promise<MailFolder[]> {
-  const client = await getClient(email, password);
-  const list = await client.list();   // returns Promise<ListResponse[]>
-  return list.map(mailbox => ({
-    path: mailbox.path,
-    name: mailbox.name,
-    delimiter: mailbox.delimiter ?? "/",
-    flags: Array.from(mailbox.flags ?? []),
-    specialUse: mailbox.specialUse,
-    subscribed: mailbox.subscribed ?? false,
-  }));
+  return withClient(email, password, async (client) => {
+    const list = await client.list();
+    return list.map(mailbox => ({
+      path: mailbox.path,
+      name: mailbox.name,
+      delimiter: mailbox.delimiter ?? "/",
+      flags: Array.from(mailbox.flags ?? []),
+      specialUse: mailbox.specialUse,
+      subscribed: mailbox.subscribed ?? false,
+    }));
+  });
 }
 
 export async function fetchMessages(
@@ -63,46 +104,47 @@ export async function fetchMessages(
   page: number,
   limit: number
 ): Promise<PaginatedMessages> {
-  const client = await getClient(email, password);
-  const lock = await client.getMailboxLock(folder);
-  try {
-    const status = await client.status(folder, { messages: true });
-    const total = status.messages ?? 0;
+  return withClient(email, password, async (client) => {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      const status = await client.status(folder, { messages: true });
+      const total = status.messages ?? 0;
 
-    if (total === 0) {
-      return { messages: [], total: 0, page, limit, folder };
+      if (total === 0) {
+        return { messages: [], total: 0, page, limit, folder };
+      }
+
+      const start = Math.max(1, total - (page * limit) + 1);
+      const end   = Math.max(1, total - ((page - 1) * limit));
+      const range = `${start}:${end}`;
+
+      const messages: MailHeader[] = [];
+      for await (const msg of client.fetch(range, {
+        uid: true, flags: true, envelope: true, bodyStructure: true, size: true,
+      })) {
+        const from = (msg.envelope?.from as Array<{ name?: string; address?: string }>)?.[0];
+        const toList = (msg.envelope?.to as Array<{ name?: string; address?: string }>) ?? [];
+        messages.push({
+          uid: msg.uid,
+          seq: msg.seq,
+          flags: Array.from(msg.flags ?? []),
+          from: fmtAddr(from),
+          to: toList.map(a => a.address ?? "").join(", "),
+          subject: msg.envelope?.subject ?? "(no subject)",
+          date: msg.envelope?.date ?? new Date(),
+          size: msg.size ?? 0,
+          seen: (msg.flags ?? new Set()).has("\\Seen"),
+          answered: (msg.flags ?? new Set()).has("\\Answered"),
+          flagged: (msg.flags ?? new Set()).has("\\Flagged"),
+          hasAttachments: hasAttachment(msg.bodyStructure),
+        });
+      }
+
+      return { messages: messages.reverse(), total, page, limit, folder };
+    } finally {
+      lock.release();
     }
-
-    const start = Math.max(1, total - (page * limit) + 1);
-    const end   = Math.max(1, total - ((page - 1) * limit));
-    const range = `${start}:${end}`;
-
-    const messages: MailHeader[] = [];
-    for await (const msg of client.fetch(range, {
-      uid: true, flags: true, envelope: true, bodyStructure: true, size: true,
-    })) {
-      const from = (msg.envelope?.from as Array<{ name?: string; address?: string }>)?.[0];
-      const toList = (msg.envelope?.to as Array<{ name?: string; address?: string }>) ?? [];
-      messages.push({
-        uid: msg.uid,
-        seq: msg.seq,
-        flags: Array.from(msg.flags ?? []),
-        from: fmtAddr(from),
-        to: toList.map(a => a.address ?? "").join(", "),
-        subject: msg.envelope?.subject ?? "(no subject)",
-        date: msg.envelope?.date ?? new Date(),
-        size: msg.size ?? 0,
-        seen: (msg.flags ?? new Set()).has("\\Seen"),
-        answered: (msg.flags ?? new Set()).has("\\Answered"),
-        flagged: (msg.flags ?? new Set()).has("\\Flagged"),
-        hasAttachments: hasAttachment(msg.bodyStructure),
-      });
-    }
-
-    return { messages: messages.reverse(), total, page, limit, folder };
-  } finally {
-    lock.release();
-  }
+  });
 }
 
 export async function fetchMessage(
@@ -111,48 +153,49 @@ export async function fetchMessage(
   folder: string,
   uid: number
 ): Promise<MailMessage | null> {
-  const client = await getClient(email, password);
-  const lock = await client.getMailboxLock(folder);
-  try {
-    const msgs: MailMessage[] = [];
-    for await (const msg of client.fetch({ uid }, {
-      uid: true, flags: true, envelope: true, bodyStructure: true, source: true, size: true,
-    })) {
-      const parsed = await simpleParser(msg.source ?? Buffer.alloc(0));
-      const from = (msg.envelope?.from as Array<{ name?: string; address?: string }>)?.[0];
-      const toList = (msg.envelope?.to as Array<{ name?: string; address?: string }>) ?? [];
-      msgs.push({
-        uid: msg.uid,
-        seq: msg.seq,
-        flags: Array.from(msg.flags ?? []),
-        from: fmtAddr(from),
-        to: toList.map(a => a.address ?? "").join(", "),
-        subject: msg.envelope?.subject ?? "(no subject)",
-        date: msg.envelope?.date ?? new Date(),
-        size: msg.size ?? 0,
-        seen: (msg.flags ?? new Set()).has("\\Seen"),
-        answered: (msg.flags ?? new Set()).has("\\Answered"),
-        flagged: (msg.flags ?? new Set()).has("\\Flagged"),
-        hasAttachments: (parsed.attachments?.length ?? 0) > 0,
-        html: typeof parsed.html === "string" ? parsed.html : undefined,
-        text: parsed.text ?? undefined,
-        attachments: (parsed.attachments ?? []).map(a => ({
-          filename: a.filename ?? "attachment",
-          contentType: a.contentType,
-          size: a.size ?? 0,
-          cid: a.cid,
-        })),
-      });
-    }
+  return withClient(email, password, async (client) => {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      const msgs: MailMessage[] = [];
+      for await (const msg of client.fetch({ uid }, {
+        uid: true, flags: true, envelope: true, bodyStructure: true, source: true, size: true,
+      })) {
+        const parsed = await simpleParser(msg.source ?? Buffer.alloc(0));
+        const from = (msg.envelope?.from as Array<{ name?: string; address?: string }>)?.[0];
+        const toList = (msg.envelope?.to as Array<{ name?: string; address?: string }>) ?? [];
+        msgs.push({
+          uid: msg.uid,
+          seq: msg.seq,
+          flags: Array.from(msg.flags ?? []),
+          from: fmtAddr(from),
+          to: toList.map(a => a.address ?? "").join(", "),
+          subject: msg.envelope?.subject ?? "(no subject)",
+          date: msg.envelope?.date ?? new Date(),
+          size: msg.size ?? 0,
+          seen: (msg.flags ?? new Set()).has("\\Seen"),
+          answered: (msg.flags ?? new Set()).has("\\Answered"),
+          flagged: (msg.flags ?? new Set()).has("\\Flagged"),
+          hasAttachments: (parsed.attachments?.length ?? 0) > 0,
+          html: typeof parsed.html === "string" ? parsed.html : undefined,
+          text: parsed.text ?? undefined,
+          attachments: (parsed.attachments ?? []).map(a => ({
+            filename: a.filename ?? "attachment",
+            contentType: a.contentType,
+            size: a.size ?? 0,
+            cid: a.cid,
+          })),
+        });
+      }
 
-    if (msgs.length) {
-      await client.messageFlagsAdd({ uid }, ["\\Seen"], { uid: true });
-    }
+      if (msgs.length) {
+        await client.messageFlagsAdd({ uid }, ["\\Seen"], { uid: true });
+      }
 
-    return msgs[0] ?? null;
-  } finally {
-    lock.release();
-  }
+      return msgs[0] ?? null;
+    } finally {
+      lock.release();
+    }
+  });
 }
 
 export async function moveMessage(
@@ -162,13 +205,14 @@ export async function moveMessage(
   uid: number,
   destFolder: string
 ): Promise<void> {
-  const client = await getClient(email, password);
-  const lock = await client.getMailboxLock(sourceFolder);
-  try {
-    await client.messageMove({ uid }, destFolder, { uid: true });
-  } finally {
-    lock.release();
-  }
+  return withClient(email, password, async (client) => {
+    const lock = await client.getMailboxLock(sourceFolder);
+    try {
+      await client.messageMove({ uid }, destFolder, { uid: true });
+    } finally {
+      lock.release();
+    }
+  });
 }
 
 export async function deleteMessage(
@@ -180,6 +224,23 @@ export async function deleteMessage(
   await moveMessage(email, password, folder, uid, "Trash");
 }
 
+export async function expungeMessage(
+  email: string,
+  password: string,
+  folder: string,
+  uid: number
+): Promise<void> {
+  return withClient(email, password, async (client) => {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      await client.messageFlagsAdd({ uid }, ["\\Deleted"], { uid: true });
+      await client.messageDelete({ uid }, { uid: true });
+    } finally {
+      lock.release();
+    }
+  });
+}
+
 export async function toggleFlag(
   email: string,
   password: string,
@@ -188,17 +249,18 @@ export async function toggleFlag(
   flag: string,
   add: boolean
 ): Promise<void> {
-  const client = await getClient(email, password);
-  const lock = await client.getMailboxLock(folder);
-  try {
-    if (add) {
-      await client.messageFlagsAdd({ uid }, [flag], { uid: true });
-    } else {
-      await client.messageFlagsRemove({ uid }, [flag], { uid: true });
+  return withClient(email, password, async (client) => {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      if (add) {
+        await client.messageFlagsAdd({ uid }, [flag], { uid: true });
+      } else {
+        await client.messageFlagsRemove({ uid }, [flag], { uid: true });
+      }
+    } finally {
+      lock.release();
     }
-  } finally {
-    lock.release();
-  }
+  });
 }
 
 export async function appendToSent(
@@ -206,7 +268,6 @@ export async function appendToSent(
   password: string,
   opts: { from: string; to: string; subject: string; text?: string; html?: string }
 ): Promise<void> {
-  const client = await getClient(email, password);
   const date = new Date().toUTCString();
   const body = opts.text ?? (opts.html ? opts.html.replace(/<[^>]*>/g, "") : "");
   const raw = [
@@ -220,7 +281,9 @@ export async function appendToSent(
     body,
   ].join("\r\n");
   try {
-    await client.append("Sent", Buffer.from(raw), ["\\Seen"]);
+    await withClient(email, password, (client) =>
+      client.append("Sent", Buffer.from(raw), ["\\Seen"])
+    );
   } catch {
     // Non-fatal: don't fail the send if Sent append fails
   }

@@ -61,7 +61,7 @@ router.post("/refresh", async (req, res, next) => {
 
     res.json({
       accessToken: issueAccessToken(user),
-      user: { email: user.email, role: user.role, domain: user.domain },
+      user: { email: user.email, role: user.role, domain: user.domain, displayName: user.displayName },
     });
   } catch {
     res.status(401).json({ error: "Invalid refresh token" });

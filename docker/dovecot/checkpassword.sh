@@ -16,7 +16,26 @@ IFS= read -r -d '' PASSWORD <&3 || true
 API_URL="${INTERNAL_API_URL:-http://api:3000}"
 TOKEN="${INTERNAL_AUTH_TOKEN:-change-me-internal-secret}"
 
-# Call our API
+LOCAL="${USERNAME%@*}"
+DOMAIN="${USERNAME#*@}"
+HOME_DIR="/var/mail/vhosts/${DOMAIN}/${LOCAL}"
+
+# If no password supplied this is a userdb-only lookup (e.g. LMTP delivery)
+# Just check the user exists; no credential verification needed.
+if [ -z "$PASSWORD" ]; then
+  EXIST=$(curl -s --max-time 5 \
+    "${API_URL}/internal/virtual-user?email=${USERNAME}" \
+    -H "X-Internal-Token: ${TOKEN}")
+  OK=$(echo "$EXIST" | grep -o '"exists":true' || true)
+  if [ -z "$OK" ]; then
+    exit 1
+  fi
+  export HOME="$HOME_DIR"
+  export EXTRA="uid=5000 gid=5000 home=$HOME_DIR mail=maildir:$HOME_DIR"
+  exec "$@"
+fi
+
+# Full authentication: verify username + password via API
 RESPONSE=$(curl -s --max-time 5 \
   -X POST "${API_URL}/internal/auth" \
   -H "Content-Type: application/json" \
@@ -30,8 +49,8 @@ if [ -z "$OK" ]; then
   exit 1
 fi
 
-# Extract fields from JSON (simple grep approach, no jq dependency)
-HOME_DIR=$(echo "$RESPONSE" | grep -oP '"home":"\K[^"]+' || echo "/var/mail/vhosts/${USERNAME#*@}/${USERNAME%@*}")
+# Extract home dir from response if provided
+HOME_DIR=$(echo "$RESPONSE" | grep -oP '"home":"\K[^"]+' || echo "$HOME_DIR")
 
 # Set Dovecot userdb environment variables
 export HOME="$HOME_DIR"

@@ -3,36 +3,14 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Folder, FileText, Upload, ExternalLink, ChevronRight,
-  Image, FileSpreadsheet, Presentation, FileCode, Film, Music,
-  Pencil,
+  Image, FileSpreadsheet, Presentation, FileCode, Film, Music, Pencil,
 } from "lucide-react";
 import { apiClient } from "../api/client.ts";
 import { formatBytes } from "../lib/utils.ts";
 import { useToastStore } from "../store/index.ts";
 
-const ncUrl              = import.meta.env.VITE_NC_URL ?? "/nextcloud";
-// Set VITE_COLLABORA_ENABLED=false in your .env to hide the "Open in Office" button
-const collaboraEnabled   = import.meta.env.VITE_COLLABORA_ENABLED !== "false";
-
-const OFFICE_TYPES = new Set([
-  "docx","doc","odt","rtf",          // word processor
-  "xlsx","xls","ods","csv",           // spreadsheet
-  "pptx","ppt","odp",                 // presentation
-  "pdf",                              // PDF (Collabora can view PDFs)
-]);
-
 function fileExt(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
-}
-
-function isOfficeFile(name: string) {
-  return OFFICE_TYPES.has(fileExt(name));
-}
-
-function officeUrl(path: string, name: string) {
-  // Opens the file in Nextcloud Files, which auto-launches Collabora for supported types
-  const dir = path.endsWith("/") ? path.slice(0, -1) : path;
-  return `${ncUrl}/index.php/apps/files/?dir=${encodeURIComponent(dir)}&scrollto=${encodeURIComponent(name)}`;
 }
 
 function FileIcon({ name, contentType, isDir }: { name: string; contentType?: string; isDir?: boolean }) {
@@ -49,6 +27,29 @@ function FileIcon({ name, contentType, isDir }: { name: string; contentType?: st
   if (t.includes("text/") || t.includes("json") || t.includes("xml"))
                                                            return <FileCode     size={28} className="text-blue-400" />;
   return <FileText size={28} className="text-blue-500" />;
+}
+
+const OFFICE_TYPES = new Set(["doc","docx","odt","xls","xlsx","ods","ppt","pptx","odp"]);
+
+function isOfficeFile(name: string) {
+  return OFFICE_TYPES.has(name.split(".").pop()?.toLowerCase() ?? "");
+}
+
+// Opens Nextcloud with the user already logged in.
+// 1. Calls backend (with JWT) to do server-side NC login → gets one-time token
+// 2. Opens /api/files/nc-redirect?token=<token> in new tab — sets NC session cookies + redirects
+async function openNextcloud(redirect = "/index.php/apps/files/") {
+  try {
+    const { data } = await apiClient.post<{ token: string }>("/files/nc-login", { redirect });
+    window.open(`/api/files/nc-redirect?token=${data.token}`, "_blank");
+  } catch {
+    window.open(`/nextcloud${redirect}`, "_blank");
+  }
+}
+
+async function openInCollabora(filePath: string) {
+  const redirect = `/index.php/apps/files/?dir=${encodeURIComponent(filePath.substring(0, filePath.lastIndexOf("/")))}&openfile=${encodeURIComponent(filePath)}`;
+  openNextcloud(redirect);
 }
 
 export default function FilesPage() {
@@ -121,18 +122,6 @@ export default function FilesPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {collaboraEnabled && (
-            <a
-              href={`${ncUrl}/index.php/apps/files/`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-[#5f6368] hover:text-[#202124]
-                         border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-colors"
-              title="Open LibreOffice Online via Nextcloud"
-            >
-              <Pencil size={13} /> Office
-            </a>
-          )}
           <button
             onClick={open}
             className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700
@@ -140,28 +129,15 @@ export default function FilesPage() {
           >
             <Upload size={14} /> Upload
           </button>
-          <a
-            href={`${ncUrl}/index.php/apps/files`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => openNextcloud("/index.php/apps/files/")}
             className="flex items-center gap-1.5 text-sm text-[#5f6368] hover:text-[#202124]
                        border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-colors"
           >
             Open Nextcloud <ExternalLink size={12} />
-          </a>
+          </button>
         </div>
       </div>
-
-      {/* LibreOffice info banner */}
-      {collaboraEnabled && (
-        <div className="px-6 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2 flex-shrink-0">
-          <Pencil size={13} className="text-amber-600 flex-shrink-0" />
-          <p className="text-xs text-amber-800">
-            Click <strong>Open in Office</strong> on any document to edit it in LibreOffice directly in the browser.
-            Set <code className="bg-amber-100 px-1 rounded">VITE_COLLABORA_ENABLED=false</code> in your build to disable.
-          </p>
-        </div>
-      )}
 
       {/* Drop overlay */}
       {isDragActive && (
@@ -209,31 +185,24 @@ export default function FilesPage() {
                            group transition-colors border border-transparent hover:border-gray-200 relative"
                 onClick={() => file.isDirectory && navigate(file.name)}
               >
-                <div className="mb-2">
+                <div className="mb-2 relative">
                   <FileIcon name={file.name} contentType={file.contentType} isDir={file.isDirectory} />
+                  {!file.isDirectory && isOfficeFile(file.name) && (
+                    <button
+                      onClick={e => { e.stopPropagation(); openInCollabora(path + file.name); }}
+                      className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center
+                                 w-5 h-5 bg-blue-600 text-white rounded-full shadow"
+                      title="Open in LibreOffice"
+                    >
+                      <Pencil size={10} />
+                    </button>
+                  )}
                 </div>
                 <span className="text-xs text-[#202124] text-center truncate w-full font-medium">
                   {file.name}
                 </span>
                 {!file.isDirectory && file.size != null && (
                   <span className="text-xs text-[#5f6368] mt-0.5">{formatBytes(file.size)}</span>
-                )}
-
-                {/* Open in Office button — appears on hover for document types */}
-                {!file.isDirectory && collaboraEnabled && isOfficeFile(file.name) && (
-                  <a
-                    href={officeUrl(path, file.name)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()}
-                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100
-                               bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-md
-                               px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1
-                               transition-opacity whitespace-nowrap"
-                    title="Open in LibreOffice Online"
-                  >
-                    <Pencil size={9} /> Office
-                  </a>
                 )}
               </div>
             ))}

@@ -87,6 +87,7 @@ services:
       NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:-localhost}
       REDIS_HOST: redis
       REDIS_HOST_PASSWORD: ${REDIS_PASSWORD}
+      SERVER_URL: ${SERVER_URL}
     volumes:
       - nextcloud_data:/var/www/html/data
       - nextcloud_html:/var/www/html

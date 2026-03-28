@@ -4,6 +4,7 @@ import { User, Domain, type IUser, type UserRole } from "../models/User.js";
 import { Tenant } from "../models/Tenant.js";
 import { config } from "../config/index.js";
 import type { AuthTokenPayload } from "../types/index.js";
+import { provisionUser as provisionNextcloudUser } from "./nextcloudService.js";
 
 // ── Auth ──────────────────────────────────────────────────
 export async function verifyCredentials(email: string, password: string): Promise<IUser | null> {
@@ -80,11 +81,17 @@ export async function createUser(opts: {
   }
 
   const hash = await argon2.hash(password, { type: argon2.argon2id });
-  return User.findOneAndUpdate(
+  const user = await User.findOneAndUpdate(
     { email: email.toLowerCase() },
     { email: email.toLowerCase(), password: hash, domain, role, quotaMb, displayName: displayName || undefined, active: true },
     { upsert: true, new: true, setDefaultsOnInsert: true }
-  ) as Promise<IUser>;
+  ) as IUser;
+
+  // Provision Nextcloud account immediately — fire-and-forget so NC downtime never blocks user creation
+  provisionNextcloudUser(email.toLowerCase(), password)
+    .catch(err => console.error("[nextcloud] provision failed for", email, err.message));
+
+  return user;
 }
 
 export async function domainExists(domain: string): Promise<boolean> {

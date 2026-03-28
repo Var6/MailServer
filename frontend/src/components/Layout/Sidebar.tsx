@@ -39,6 +39,15 @@ const SPECIAL_MAP: Record<string, { icon: typeof Inbox; label: string; order: nu
   "Archive": { icon: Archive,      label: "Archive", order: 5 },
 };
 
+// Shown when the server folder list hasn't loaded yet or fails
+const FALLBACK_FOLDERS = [
+  { path: "INBOX",   name: "INBOX"   },
+  { path: "Sent",    name: "Sent"    },
+  { path: "Drafts",  name: "Drafts"  },
+  { path: "Junk",    name: "Junk"    },
+  { path: "Trash",   name: "Trash"   },
+];
+
 export default function Sidebar() {
   const { email, displayName, role, clearAuth } = useAuthStore();
   const { selectedFolder, setFolder, openCompose } = useMailStore();
@@ -49,8 +58,10 @@ export default function Sidebar() {
   const { data: folders = [] } = useQuery({
     queryKey: ["folders"],
     queryFn: getFolders,
-    enabled: isMailRoute,
+    enabled: isMailRoute && role !== "superadmin",
     staleTime: 60_000,
+    retry: 2,
+    retryDelay: 1500,
   });
 
   const handleLogout = async () => {
@@ -67,7 +78,9 @@ export default function Sidebar() {
                  : role === "admin"      ? ADMIN_NAV
                  : USER_NAV;
 
-  const mainFolders = folders
+  // Use fallback folders while loading or if the API failed — always show something
+  const effectiveFolders = folders.length > 0 ? folders : FALLBACK_FOLDERS;
+  const mainFolders = effectiveFolders
     .filter(f => SPECIAL_MAP[f.name])
     .sort((a, b) => (SPECIAL_MAP[a.name]?.order ?? 99) - (SPECIAL_MAP[b.name]?.order ?? 99));
   const otherFolders = folders.filter(f => !SPECIAL_MAP[f.name]);
@@ -113,7 +126,7 @@ export default function Sidebar() {
         ))}
 
         {/* Mail folders — only visible on mail route */}
-        {isMailRoute && (
+        {isMailRoute && role !== "superadmin" && (
           <div className="mt-2 border-t border-gray-100 pt-2">
             {mainFolders.map(f => {
               const meta = SPECIAL_MAP[f.name];

@@ -55,6 +55,11 @@ const sendSchema = z.object({
   subject: z.string(),
   text: z.string().optional(),
   html: z.string().optional(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    content: z.string(),      // base64
+    contentType: z.string(),
+  })).optional(),
 });
 
 router.post("/send", async (req, res, next) => {
@@ -62,7 +67,12 @@ router.post("/send", async (req, res, next) => {
     const opts = sendSchema.parse(req.body);
     const from = req.user!.sub;
     const password = req.userPassword!;
-    await sendMail({ ...opts, from }, password);
+    const attachments = opts.attachments?.map(a => ({
+      filename: a.filename,
+      content: Buffer.from(a.content, "base64"),
+      contentType: a.contentType,
+    }));
+    await sendMail({ ...opts, from, attachments }, password);
     const toStr = Array.isArray(opts.to) ? opts.to.join(", ") : opts.to;
     imap.appendToSent(from, password, { from, to: toStr, subject: opts.subject, text: opts.text, html: opts.html }).catch(() => {});
     res.json({ ok: true });
@@ -85,6 +95,16 @@ router.delete("/messages/:uid", async (req, res, next) => {
     const uid    = parseInt(req.params.uid);
     const folder = (req.query.folder as string) || "INBOX";
     await imap.deleteMessage(req.user!.sub, req.userPassword!, folder, uid);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// DELETE /mail/messages/:uid/permanent  (expunge — no recovery)
+router.delete("/messages/:uid/permanent", async (req, res, next) => {
+  try {
+    const uid    = parseInt(req.params.uid);
+    const folder = (req.query.folder as string) || "Trash";
+    await imap.expungeMessage(req.user!.sub, req.userPassword!, folder, uid);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

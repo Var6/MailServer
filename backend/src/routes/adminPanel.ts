@@ -4,10 +4,12 @@
  */
 import { Router } from "express";
 import { z } from "zod";
+import argon2 from "argon2";
 import { requireAuth, requireRole, requireSameTenant } from "../middleware/auth.js";
 import { User } from "../models/User.js";
 import { Tenant } from "../models/Tenant.js";
 import { createUser, getUsersByDomain, countUsersByDomain } from "../services/authService.js";
+import { provisionUser as provisionNextcloudUser } from "../services/nextcloudService.js";
 
 const router = Router();
 router.use(requireAuth, requireRole("admin", "superadmin"));
@@ -88,6 +90,23 @@ router.patch("/users/:email", requireSameTenant(), async (req, res, next) => {
     );
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(user);
+  } catch (e) { next(e); }
+});
+
+// PATCH /admin/users/:email/password — Reset password in mail + Nextcloud (same domain only)
+router.patch("/users/:email/password", requireSameTenant(), async (req, res, next) => {
+  try {
+    const { password } = z.object({ password: z.string().min(8) }).parse(req.body);
+    const hash = await argon2.hash(password, { type: argon2.argon2id });
+    const user = await User.findOneAndUpdate(
+      { email: req.params.email.toLowerCase(), domain: req.user!.domain },
+      { password: hash },
+      { new: true, projection: { password: 0 } }
+    );
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    provisionNextcloudUser(req.params.email.toLowerCase(), password)
+      .catch(err => console.error("[nextcloud] provision failed:", err.message));
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 
