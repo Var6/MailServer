@@ -39,7 +39,6 @@ broken_sasl_auth_clients  = yes
 
 # --- TLS (inbound disabled for local demo) ---
 smtpd_use_tls             = no
-smtp_tls_security_level   = may
 
 # --- Restrictions ---
 smtpd_helo_required       = yes

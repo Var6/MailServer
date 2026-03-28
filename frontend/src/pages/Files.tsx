@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Folder, FileText, Upload, ExternalLink, ChevronRight,
-  Image, FileSpreadsheet, Presentation, FileCode, Film, Music,
+  Image, FileSpreadsheet, Presentation, FileCode, Film, Music, Pencil,
 } from "lucide-react";
 import { apiClient } from "../api/client.ts";
 import { formatBytes } from "../lib/utils.ts";
@@ -29,6 +29,12 @@ function FileIcon({ name, contentType, isDir }: { name: string; contentType?: st
   return <FileText size={28} className="text-blue-500" />;
 }
 
+const OFFICE_TYPES = new Set(["doc","docx","odt","xls","xlsx","ods","ppt","pptx","odp"]);
+
+function isOfficeFile(name: string) {
+  return OFFICE_TYPES.has(name.split(".").pop()?.toLowerCase() ?? "");
+}
+
 // Opens Nextcloud with the user already logged in.
 // 1. Calls backend (with JWT) to do server-side NC login → gets one-time token
 // 2. Opens /api/files/nc-redirect?token=<token> in new tab — sets NC session cookies + redirects
@@ -39,6 +45,11 @@ async function openNextcloud(redirect = "/index.php/apps/files/") {
   } catch {
     window.open(`/nextcloud${redirect}`, "_blank");
   }
+}
+
+async function openInCollabora(filePath: string) {
+  const redirect = `/index.php/apps/files/?dir=${encodeURIComponent(filePath.substring(0, filePath.lastIndexOf("/")))}&openfile=${encodeURIComponent(filePath)}`;
+  openNextcloud(redirect);
 }
 
 export default function FilesPage() {
@@ -174,8 +185,18 @@ export default function FilesPage() {
                            group transition-colors border border-transparent hover:border-gray-200 relative"
                 onClick={() => file.isDirectory && navigate(file.name)}
               >
-                <div className="mb-2">
+                <div className="mb-2 relative">
                   <FileIcon name={file.name} contentType={file.contentType} isDir={file.isDirectory} />
+                  {!file.isDirectory && isOfficeFile(file.name) && (
+                    <button
+                      onClick={e => { e.stopPropagation(); openInCollabora(path + file.name); }}
+                      className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center
+                                 w-5 h-5 bg-blue-600 text-white rounded-full shadow"
+                      title="Open in LibreOffice"
+                    >
+                      <Pencil size={10} />
+                    </button>
+                  )}
                 </div>
                 <span className="text-xs text-[#202124] text-center truncate w-full font-medium">
                   {file.name}
@@ -183,7 +204,6 @@ export default function FilesPage() {
                 {!file.isDirectory && file.size != null && (
                   <span className="text-xs text-[#5f6368] mt-0.5">{formatBytes(file.size)}</span>
                 )}
-
               </div>
             ))}
           </div>

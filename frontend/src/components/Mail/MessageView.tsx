@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Reply, Forward, Trash2, Star, MoreVertical,
   Paperclip, ChevronDown, ExternalLink, Printer, Archive,
-  CornerUpLeft, RotateCcw, X,
+  CornerUpLeft, RotateCcw, X, MailOpen,
 } from "lucide-react";
 import { getMessage, flagMessage, deleteMessage, moveMessage, permanentDeleteMessage } from "../../api/mailApi.ts";
-import { useMailStore, useToastStore } from "../../store/index.ts";
+import { useMailStore, useToastStore, useAuthStore } from "../../store/index.ts";
 import { formatFullDate, avatarColor, senderInitial, senderName } from "../../lib/utils.ts";
 import { MessageSkeleton } from "../ui/Skeleton.tsx";
 import { formatBytes } from "../../lib/utils.ts";
@@ -14,6 +14,7 @@ import { formatBytes } from "../../lib/utils.ts";
 export default function MessageView() {
   const { selectedUid, selectedFolder, openCompose } = useMailStore();
   const { addToast } = useToastStore();
+  const userEmail = useAuthStore(s => s.email);
   const qc = useQueryClient();
   const [showDetails, setShowDetails] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,12 +25,28 @@ export default function MessageView() {
     enabled: selectedUid !== null,
   });
 
+  // After fetching (which marks \Seen server-side), refresh the list so bold/unread count updates
+  useEffect(() => {
+    if (msg) {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+    }
+  }, [msg?.uid]);
+
   const starMutation = useMutation({
     mutationFn: (add: boolean) => flagMessage(selectedUid!, selectedFolder, "\\Flagged", add),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages"] });
       qc.invalidateQueries({ queryKey: ["message"] });
       addToast(msg?.flagged ? "Removed star" : "Starred", "success");
+    },
+  });
+
+  const markUnreadMutation = useMutation({
+    mutationFn: () => flagMessage(selectedUid!, selectedFolder, "\\Seen", false),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      qc.invalidateQueries({ queryKey: ["message"] });
+      addToast("Marked as unread", "success");
     },
   });
 
@@ -50,10 +67,16 @@ export default function MessageView() {
   });
 
   const restoreMutation = useMutation({
-    mutationFn: () => moveMessage(selectedUid!, selectedFolder, "INBOX"),
+    mutationFn: () => {
+      // If the user's own email is in the From header, it was a sent message
+      const isSent = msg && userEmail && msg.from.toLowerCase().includes(userEmail.toLowerCase());
+      const restoreFolder = isSent ? "Sent" : "INBOX";
+      return moveMessage(selectedUid!, selectedFolder, restoreFolder);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages"] });
-      addToast("Restored to Inbox", "success");
+      const isSent = msg && userEmail && msg.from.toLowerCase().includes(userEmail.toLowerCase());
+      addToast(isSent ? "Restored to Sent" : "Restored to Inbox", "success");
     },
   });
 
@@ -65,7 +88,8 @@ export default function MessageView() {
     },
   });
 
-  const isTrash = selectedFolder === "Trash";
+  const isTrash   = selectedFolder === "Trash";
+  const isArchive = selectedFolder === "Archive";
 
   if (!selectedUid) {
     return (
@@ -113,7 +137,7 @@ export default function MessageView() {
             <button
               onClick={() => restoreMutation.mutate()}
               className="btn-ghost flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700"
-              title="Restore to Inbox"
+              title="Restore to original folder"
             >
               <RotateCcw size={16} /> Restore
             </button>
@@ -125,8 +149,32 @@ export default function MessageView() {
               <X size={16} /> Delete Forever
             </button>
           </>
+        ) : isArchive ? (
+          <>
+            <button
+              onClick={() => moveMessage(selectedUid!, selectedFolder, "INBOX").then(() => qc.invalidateQueries({ queryKey: ["messages"] })).then(() => addToast("Moved to Inbox", "success"))}
+              className="btn-ghost flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700"
+              title="Move back to Inbox"
+            >
+              <RotateCcw size={16} /> Move to Inbox
+            </button>
+            <button
+              onClick={() => deleteMutation.mutate()}
+              className="btn-ghost p-2 hover:text-red-500"
+              title="Move to Trash"
+            >
+              <Trash2 size={18} />
+            </button>
+          </>
         ) : (
           <>
+            <button
+              onClick={() => markUnreadMutation.mutate()}
+              className="btn-ghost p-2"
+              title="Mark as unread"
+            >
+              <MailOpen size={18} />
+            </button>
             <button
               onClick={() => archiveMutation.mutate()}
               className="btn-ghost p-2"

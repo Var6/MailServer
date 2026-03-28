@@ -15,7 +15,8 @@ import internalRouter from "./routes/internal.js";
 import tenantRouter   from "./routes/tenants.js";
 import adminRouter    from "./routes/adminPanel.js";
 import billingRouter  from "./routes/billing.js";
-import setupRouter    from "./routes/setup.js";
+import setupRouter        from "./routes/setup.js";
+import inboundWebhookRouter from "./routes/inboundWebhook.js";
 import { startPostfixTcpMap } from "./services/postfixTcpMap.js";
 
 const app = express();
@@ -24,6 +25,9 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? "*", credentials: true }));
 app.set("trust proxy", 1);
+
+// ── Inbound webhook (Brevo) — registered before rate limiter, needs large body ─
+app.use("/inbound", express.json({ limit: "25mb" }), inboundWebhookRouter);
 
 // ── Parsing ───────────────────────────────────────────────
 app.use(express.json({ limit: "50mb" }));
