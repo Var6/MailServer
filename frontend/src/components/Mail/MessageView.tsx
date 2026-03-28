@@ -3,9 +3,9 @@ import { useState } from "react";
 import {
   Reply, Forward, Trash2, Star, MoreVertical,
   Paperclip, ChevronDown, ExternalLink, Printer, Archive,
-  CornerUpLeft
+  CornerUpLeft, RotateCcw, X,
 } from "lucide-react";
-import { getMessage, flagMessage, deleteMessage, moveMessage } from "../../api/mailApi.ts";
+import { getMessage, flagMessage, deleteMessage, moveMessage, permanentDeleteMessage } from "../../api/mailApi.ts";
 import { useMailStore, useToastStore } from "../../store/index.ts";
 import { formatFullDate, avatarColor, senderInitial, senderName } from "../../lib/utils.ts";
 import { MessageSkeleton } from "../ui/Skeleton.tsx";
@@ -49,6 +49,24 @@ export default function MessageView() {
     },
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: () => moveMessage(selectedUid!, selectedFolder, "INBOX"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      addToast("Restored to Inbox", "success");
+    },
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: () => permanentDeleteMessage(selectedUid!, selectedFolder),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      addToast("Deleted forever", "success");
+    },
+  });
+
+  const isTrash = selectedFolder === "Trash";
+
   if (!selectedUid) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
@@ -90,20 +108,41 @@ export default function MessageView() {
           <Forward size={16} /> Forward
         </button>
         <div className="flex-1" />
-        <button
-          onClick={() => archiveMutation.mutate()}
-          className="btn-ghost p-2"
-          title="Archive"
-        >
-          <Archive size={18} />
-        </button>
-        <button
-          onClick={() => deleteMutation.mutate()}
-          className="btn-ghost p-2 hover:text-red-500"
-          title="Delete"
-        >
-          <Trash2 size={18} />
-        </button>
+        {isTrash ? (
+          <>
+            <button
+              onClick={() => restoreMutation.mutate()}
+              className="btn-ghost flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700"
+              title="Restore to Inbox"
+            >
+              <RotateCcw size={16} /> Restore
+            </button>
+            <button
+              onClick={() => permanentDeleteMutation.mutate()}
+              className="btn-ghost flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700"
+              title="Delete Forever"
+            >
+              <X size={16} /> Delete Forever
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => archiveMutation.mutate()}
+              className="btn-ghost p-2"
+              title="Archive"
+            >
+              <Archive size={18} />
+            </button>
+            <button
+              onClick={() => deleteMutation.mutate()}
+              className="btn-ghost p-2 hover:text-red-500"
+              title="Move to Trash"
+            >
+              <Trash2 size={18} />
+            </button>
+          </>
+        )}
         <button
           onClick={() => starMutation.mutate(!msg.flagged)}
           className="btn-ghost p-2"

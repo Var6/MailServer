@@ -20,5 +20,8 @@ export const moveMessage = (uid: number, folder: string, destination: string) =>
 export const deleteMessage = (uid: number, folder: string) =>
   apiClient.delete(`/mail/messages/${uid}`, { params: { folder } }).then(r => r.data);
 
+export const permanentDeleteMessage = (uid: number, folder: string) =>
+  apiClient.delete(`/mail/messages/${uid}/permanent`, { params: { folder } }).then(r => r.data);
+
 export const flagMessage = (uid: number, folder: string, flag: string, add: boolean) =>
   apiClient.post(`/mail/messages/${uid}/flag`, { folder, flag, add }).then(r => r.data);

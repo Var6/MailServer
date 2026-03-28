@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "../store/index.ts";
 import { login } from "../api/authApi.ts";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Eye, EyeOff } from "lucide-react";
 
 export default function AdminLoginPage() {
   const nav = useNavigate();
@@ -11,6 +11,7 @@ export default function AdminLoginPage() {
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [step, setStep]         = useState<"email" | "password">("email");
@@ -104,17 +105,27 @@ export default function AdminLoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-[#202124] mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => { setPassword(e.target.value); setError(""); }}
-                required
-                autoFocus
-                className={`w-full border rounded-lg px-3.5 py-3 text-sm text-[#202124]
-                           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                           transition-all ${error ? "border-red-400" : "border-gray-300"}`}
-                placeholder="Enter your password"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError(""); }}
+                  required
+                  autoFocus
+                  className={`w-full border rounded-lg px-3.5 py-3 pr-10 text-sm text-[#202124]
+                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                             transition-all ${error ? "border-red-400" : "border-gray-300"}`}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {error && (
                 <div className="flex items-center gap-1.5 mt-2">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-red-500 flex-shrink-0">

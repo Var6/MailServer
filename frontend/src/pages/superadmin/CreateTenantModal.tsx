@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Building2, Globe, Mail, Lock, Users, HardDrive, Info } from "lucide-react";
+import { X, Building2, Globe, Mail, Lock, Users, HardDrive, Info, Eye, EyeOff } from "lucide-react";
 import { createTenant } from "../../api/superadminApi.ts";
 import { useToastStore } from "../../store/index.ts";
 import axios from "axios";
@@ -14,6 +14,7 @@ export default function CreateTenantModal({ onClose }: Props) {
     name: "", domain: "", adminEmail: "", adminPassword: "",
     adminDisplayName: "", maxUsers: 10, storagePerUserMb: 512,
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const mutation = useMutation({
     mutationFn: createTenant,
@@ -111,15 +112,25 @@ export default function CreateTenantModal({ onClose }: Props) {
               />
             </Field>
             <Field icon={<Lock size={14} />} label="Admin Password" required>
-              <input
-                value={form.adminPassword}
-                onChange={e => set("adminPassword", e.target.value)}
-                type="password"
-                minLength={8}
-                required
-                placeholder="Min. 8 characters"
-                className="field-input"
-              />
+              <div className="relative">
+                <input
+                  value={form.adminPassword}
+                  onChange={e => set("adminPassword", e.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  minLength={8}
+                  required
+                  placeholder="Min. 8 characters"
+                  className="field-input pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </Field>
           </div>
 

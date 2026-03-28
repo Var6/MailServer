@@ -34,6 +34,8 @@ export default function ComposeModal() {
   const [showBcc, setShowBcc] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // Increment to force re-render when editor selection/content changes
+  const [, setEditorTick] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -51,6 +53,8 @@ export default function ComposeModal() {
       },
     },
     autofocus: !!replyTo,
+    onUpdate:          () => setEditorTick(n => n + 1),
+    onSelectionUpdate: () => setEditorTick(n => n + 1),
   });
 
   const mutation = useMutation({
@@ -104,14 +108,13 @@ export default function ComposeModal() {
 
   const containerClass = fullscreen
     ? "fixed inset-4 rounded-2xl"
-    : "fixed bottom-0 right-6 w-[600px] rounded-t-2xl";
+    : "fixed bottom-0 right-6 w-[600px] rounded-t-2xl h-[560px]";
 
   const isBodyEmpty = !editor || editor.isEmpty;
 
   return (
     <div
       className={`${containerClass} bg-white shadow-2xl flex flex-col z-50 overflow-hidden border border-gray-200`}
-      style={{ maxHeight: fullscreen ? undefined : "calc(100vh - 80px)" }}
     >
       {/* Title bar */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-[#404040] text-white rounded-t-2xl flex-shrink-0">

@@ -48,3 +48,6 @@ export const updateUser = (email: string, patch: Partial<{
 
 export const deactivateUser = (email: string) =>
   apiClient.delete(`/admin/users/${encodeURIComponent(email)}`).then(r => r.data);
+
+export const resetUserPassword = (email: string, password: string) =>
+  apiClient.patch(`/admin/users/${encodeURIComponent(email)}/password`, { password }).then(r => r.data);

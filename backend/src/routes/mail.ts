@@ -80,6 +80,16 @@ router.delete("/messages/:uid", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// DELETE /mail/messages/:uid/permanent  (expunge — no recovery)
+router.delete("/messages/:uid/permanent", async (req, res, next) => {
+  try {
+    const uid    = parseInt(req.params.uid);
+    const folder = (req.query.folder as string) || "Trash";
+    await imap.expungeMessage(req.user!.sub, req.userPassword!, folder, uid);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // POST /mail/messages/:uid/flag
 router.post("/messages/:uid/flag", async (req, res, next) => {
   try {

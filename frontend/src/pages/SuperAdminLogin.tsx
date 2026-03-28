@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuthStore } from "../store/index.ts";
 import { login } from "../api/authApi.ts";
 
@@ -10,6 +11,7 @@ export default function SuperAdminLoginPage() {
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [step, setStep]         = useState<"email" | "password">("email");
@@ -110,17 +112,27 @@ export default function SuperAdminLoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-purple-100 mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => { setPassword(e.target.value); setError(""); }}
-                required
-                autoFocus
-                className={`w-full bg-white/20 border rounded-lg px-3.5 py-3 text-sm text-white
-                           placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-300
-                           focus:border-transparent transition-all ${error ? "border-red-400" : "border-white/30"}`}
-                placeholder="Enter your password"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError(""); }}
+                  required
+                  autoFocus
+                  className={`w-full bg-white/20 border rounded-lg px-3.5 py-3 pr-10 text-sm text-white
+                             placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-300
+                             focus:border-transparent transition-all ${error ? "border-red-400" : "border-white/30"}`}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-white"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {error && (
                 <div className="flex items-start gap-1.5 mt-2">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" className="text-red-300 flex-shrink-0 mt-0.5">

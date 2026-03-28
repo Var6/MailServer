@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Mail, Lock, Users, HardDrive, User } from "lucide-react";
+import { X, Mail, Lock, Users, HardDrive, User, Eye, EyeOff } from "lucide-react";
 import { createUser } from "../../api/adminApi.ts";
 import { useToastStore, useAuthStore } from "../../store/index.ts";
 
@@ -14,6 +14,7 @@ export default function CreateUserModal({ onClose }: Props) {
   const [form, setForm] = useState({
     localPart: "", password: "", displayName: "", quotaMb: 512,
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const mutation = useMutation({
     mutationFn: createUser,
@@ -95,15 +96,25 @@ export default function CreateUserModal({ onClose }: Props) {
             <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">
               <Lock size={13} /> Password <span className="text-red-500">*</span>
             </label>
-            <input
-              value={form.password}
-              onChange={e => set("password", e.target.value)}
-              type="password"
-              minLength={8}
-              required
-              placeholder="Min. 8 characters"
-              className="field-input"
-            />
+            <div className="relative">
+              <input
+                value={form.password}
+                onChange={e => set("password", e.target.value)}
+                type={showPassword ? "text" : "password"}
+                minLength={8}
+                required
+                placeholder="Min. 8 characters"
+                className="field-input pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
           </div>
 
           {/* Quota */}

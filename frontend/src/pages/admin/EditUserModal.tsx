@@ -1,8 +1,8 @@
 import axios from "axios";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, User, HardDrive, ToggleLeft, ToggleRight } from "lucide-react";
-import { updateUser, type AdminUser } from "../../api/adminApi.ts";
+import { X, User, HardDrive, ToggleLeft, ToggleRight, Lock, Eye, EyeOff } from "lucide-react";
+import { updateUser, resetUserPassword, type AdminUser } from "../../api/adminApi.ts";
 import { useToastStore, useAuthStore } from "../../store/index.ts";
 
 interface Props { user: AdminUser; onClose: () => void; }
@@ -31,6 +31,18 @@ export default function EditUserModal({ user, onClose }: Props) {
     setForm(f => ({ ...f, [k]: v }));
 
   const isSelf = user.email === selfEmail;
+
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
+
+  const pwMutation = useMutation({
+    mutationFn: () => resetUserPassword(user.email, newPassword),
+    onSuccess: () => {
+      addToast("Password reset — Nextcloud access updated", "success");
+      setNewPassword("");
+    },
+    onError: (e: unknown) => addToast(axios.isAxiosError(e) ? (e.response?.data?.error ?? e.message) : (e instanceof Error ? e.message : "Reset failed"), "error"),
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -97,6 +109,42 @@ export default function EditUserModal({ user, onClose }: Props) {
               </button>
             </div>
           )}
+
+          {/* Reset Password */}
+          <div className="border-t border-gray-100 pt-4 space-y-2">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-[#5f6368]">
+              <Lock size={13} /> Reset Password
+            </label>
+            <p className="text-xs text-[#5f6368]">Sets new password for mail and Nextcloud.</p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  type={showNewPw ? "text" : "password"}
+                  minLength={8}
+                  placeholder="New password (min. 8 chars)"
+                  className="field-input pr-9 w-full"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={newPassword.length < 8 || pwMutation.isPending}
+                onClick={() => pwMutation.mutate()}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {pwMutation.isPending ? "Resetting…" : "Reset"}
+              </button>
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
