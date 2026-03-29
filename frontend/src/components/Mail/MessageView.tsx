@@ -268,7 +268,7 @@ export default function MessageView() {
           <div className="text-sm text-[#202124] leading-relaxed">
             {msg.html ? (
               <div
-                className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline"
+                className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline email-body-render"
                 dangerouslySetInnerHTML={{ __html: sanitize(msg.html) }}
               />
             ) : (

@@ -9,34 +9,35 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  body { @apply bg-[#f6f8fc] text-[#202124] text-sm; }
+  body { @apply bg-[#eef2ff] text-[#202124] text-sm; }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium
-           px-4 py-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold
+           px-6 py-2.5 rounded-full transition-all shadow-sm hover:shadow-md
+           disabled:opacity-50 disabled:cursor-not-allowed text-sm;
   }
   .btn-ghost {
     @apply text-gray-600 hover:bg-gray-100 active:bg-gray-200 rounded-full
            px-3 py-1.5 transition-colors;
   }
   .mail-item {
-    @apply flex items-center px-4 py-3 cursor-pointer border-b border-gray-100
-           transition-colors hover:shadow-sm;
+    @apply flex items-center px-4 py-3 cursor-pointer border-b border-gray-200
+           transition-all;
   }
   .mail-item-unread {
     @apply bg-white font-medium;
   }
   .mail-item-read {
-    @apply bg-[#f6f8fc];
+    @apply bg-[#f8faff];
   }
   .mail-item-selected {
-    @apply bg-blue-50 !important;
+    @apply bg-[#d2e3fc] border-l-4 border-l-blue-500 !important;
   }
   .folder-btn {
-    @apply flex items-center gap-3 w-full px-4 py-2 rounded-r-full text-sm transition-colors
-           text-[#444746] hover:bg-gray-100;
+    @apply flex items-center gap-3 w-full px-4 py-2.5 rounded-r-full text-sm transition-colors
+           text-[#444746] hover:bg-blue-50;
   }
   .folder-btn-active {
     @apply bg-[#d3e3fd] text-[#001d35] font-semibold hover:bg-[#c5d9f9];
@@ -79,6 +80,13 @@
 .ProseMirror code { @apply bg-gray-100 rounded px-1 py-0.5 text-xs font-mono; }
 .ProseMirror a { @apply text-blue-600 underline; }
 .ProseMirror strong { @apply font-semibold; }
+
+/* Email body rendering — neutralize any unexpected background set by sender */
+.email-body-render {
+  background: transparent !important;
+}
+.email-body-render table { max-width: 100% !important; }
+.email-body-render img { max-width: 100% !important; height: auto !important; }
 
 @layer utilities {
   .scrollbar-thin::-webkit-scrollbar { width: 6px; }

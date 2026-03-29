@@ -86,7 +86,7 @@ export default function Sidebar() {
   const otherFolders = folders.filter(f => !SPECIAL_MAP[f.name]);
 
   return (
-    <aside className="w-64 bg-white flex flex-col h-full border-r border-gray-100 select-none">
+    <aside className="w-64 bg-white flex flex-col h-full border-r border-gray-200 select-none shadow-sm">
 
       {/* Logo */}
       <div className="px-5 py-4 flex items-center gap-2">
@@ -102,9 +102,9 @@ export default function Sidebar() {
           <button
             onClick={() => openCompose()}
             className="flex items-center gap-3 bg-[#c2e7ff] hover:bg-[#b0d8f5] active:bg-[#9ecbec]
-                       text-[#001d35] font-medium rounded-2xl px-5 py-3 w-full transition-colors shadow-sm"
+                       text-[#001d35] font-semibold rounded-2xl px-5 py-3.5 w-full transition-all shadow-md hover:shadow-lg text-sm"
           >
-            <PenSquare size={18} />
+            <PenSquare size={20} />
             Compose
           </button>
         </div>

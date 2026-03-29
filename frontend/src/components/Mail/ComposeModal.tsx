@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   X, Minimize2, Maximize2, Send, Paperclip, Minus,
@@ -18,11 +18,33 @@ import { useMailStore, useToastStore } from "../../store/index.ts";
 import { sendMail } from "../../api/mailApi.ts";
 import { formatBytes } from "../../lib/utils.ts";
 
+const DRAFT_KEY = "mail_draft";
+const RECIPIENTS_KEY = "mail_known_recipients";
+
 interface Attachment {
   filename: string;
   content: string;   // base64
   contentType: string;
   size: number;
+}
+
+function getKnownRecipients(): string[] {
+  try { return JSON.parse(localStorage.getItem(RECIPIENTS_KEY) ?? "[]"); }
+  catch { return []; }
+}
+
+function addKnownRecipient(email: string) {
+  if (!email.includes("@")) return;
+  const known = new Set(getKnownRecipients());
+  known.add(email.trim().toLowerCase());
+  localStorage.setItem(RECIPIENTS_KEY, JSON.stringify(Array.from(known)));
+}
+
+function saveRecipientsFromField(field: string) {
+  field.split(",").map(e => e.trim()).filter(Boolean).forEach(e => {
+    const match = e.match(/<(.+)>/) ?? e.match(/(\S+@\S+)/);
+    if (match) addKnownRecipient(match[1]);
+  });
 }
 
 export default function ComposeModal() {
@@ -44,8 +66,10 @@ export default function ComposeModal() {
   const [minimized, setMinimized]   = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const knownRecipients = useRef(getKnownRecipients());
 
-  // shouldRerenderOnTransaction: true is required in Tiptap v3 for toolbar active states to update
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
@@ -65,6 +89,58 @@ export default function ComposeModal() {
     immediatelyRender: false,
     shouldRerenderOnTransaction: true,
   });
+
+  // Restore draft on open (only for new compose, not reply/forward)
+  useEffect(() => {
+    if (replyTo) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "null");
+      if (saved && (saved.to || saved.subject || saved.body)) {
+        const restore = window.confirm("You have an unsaved draft. Restore it?");
+        if (restore) {
+          if (saved.to) setTo(saved.to);
+          if (saved.subject) setSubject(saved.subject);
+          // Editor may not be ready immediately
+          setTimeout(() => {
+            if (saved.body && editor) editor.commands.setContent(saved.body);
+          }, 100);
+        } else {
+          localStorage.removeItem(DRAFT_KEY);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save draft every 30 seconds
+  useEffect(() => {
+    if (replyTo) return;
+    const interval = setInterval(() => {
+      if (!to && !subject && (!editor || editor.isEmpty)) return;
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        to, subject, body: editor?.getHTML() ?? "",
+      }));
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [to, subject, editor, replyTo]);
+
+  const handleToChange = (value: string) => {
+    setTo(value);
+    const last = value.split(",").pop()?.trim() ?? "";
+    if (last.length >= 1) {
+      const matches = knownRecipients.current.filter(r => r.includes(last.toLowerCase()));
+      setToSuggestions(matches.slice(0, 6));
+      setShowSuggestions(matches.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const pickSuggestion = (email: string) => {
+    const parts = to.split(",");
+    parts[parts.length - 1] = " " + email;
+    setTo(parts.join(",").trimStart() + ", ");
+    setShowSuggestions(false);
+  };
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files) return;
@@ -94,6 +170,9 @@ export default function ComposeModal() {
       });
     },
     onSuccess: () => {
+      saveRecipientsFromField(to);
+      if (cc) saveRecipientsFromField(cc);
+      localStorage.removeItem(DRAFT_KEY);
       qc.invalidateQueries({ queryKey: ["messages"] });
       addToast("Message sent!", "success");
       closeCompose();
@@ -110,6 +189,15 @@ export default function ComposeModal() {
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
 
+  const handleClose = () => {
+    if (to || subject || (editor && !editor.isEmpty)) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        to, subject, body: editor?.getHTML() ?? "",
+      }));
+    }
+    closeCompose();
+  };
+
   if (minimized) {
     return (
       <div
@@ -120,7 +208,7 @@ export default function ComposeModal() {
           <span className="text-sm font-medium truncate">{subject || "New Message"}</span>
           <div className="flex items-center gap-1.5">
             <Maximize2 size={14} className="opacity-70" />
-            <button onClick={(e) => { e.stopPropagation(); closeCompose(); }} className="opacity-70 hover:opacity-100">
+            <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="opacity-70 hover:opacity-100">
               <X size={14} />
             </button>
           </div>
@@ -147,7 +235,7 @@ export default function ComposeModal() {
           <button onClick={() => setFullscreen(v => !v)} className="p-1 hover:bg-white/10 rounded-sm" title="Toggle fullscreen">
             {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button onClick={closeCompose} className="p-1 hover:bg-white/10 rounded-sm" title="Close">
+          <button onClick={handleClose} className="p-1 hover:bg-white/10 rounded-sm" title="Close">
             <X size={14} />
           </button>
         </div>
@@ -155,17 +243,46 @@ export default function ComposeModal() {
 
       {/* Header fields */}
       <div className="flex flex-col flex-shrink-0 border-b border-gray-200">
-        <FieldRow label="To">
-          <input
-            value={to} onChange={e => setTo(e.target.value)} placeholder="Recipients"
-            className="flex-1 outline-none text-sm py-2 text-[#202124] placeholder-[#5f6368]"
-            autoFocus={!replyTo}
-          />
-          <div className="flex items-center gap-1 text-xs text-[#5f6368]">
-            {!showCc  && <button onClick={() => setShowCc(true)}  className="hover:text-[#202124] px-1">Cc</button>}
-            {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-[#202124] px-1">Bcc</button>}
+        {/* To field with autocomplete */}
+        <div className="relative">
+          <div className="flex items-center gap-0 px-4 border-b border-gray-100">
+            <span className="text-xs text-[#5f6368] w-6 flex-shrink-0">To</span>
+            <input
+              value={to}
+              onChange={e => handleToChange(e.target.value)}
+              onFocus={() => {
+                if (to.trim()) {
+                  const last = to.split(",").pop()?.trim() ?? "";
+                  const matches = knownRecipients.current.filter(r => r.includes(last.toLowerCase()));
+                  setToSuggestions(matches.slice(0, 6));
+                  setShowSuggestions(matches.length > 0);
+                }
+              }}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="Recipients"
+              className="flex-1 outline-none text-sm py-2 text-[#202124] placeholder-[#5f6368]"
+              autoFocus={!replyTo}
+            />
+            <div className="flex items-center gap-1 text-xs text-[#5f6368]">
+              {!showCc  && <button onClick={() => setShowCc(true)}  className="hover:text-[#202124] px-1">Cc</button>}
+              {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-[#202124] px-1">Bcc</button>}
+            </div>
           </div>
-        </FieldRow>
+          {showSuggestions && toSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-40 overflow-y-auto">
+              {toSuggestions.map(email => (
+                <button
+                  key={email}
+                  onMouseDown={() => pickSuggestion(email)}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-[#202124]"
+                >
+                  {email}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {showCc && (
           <FieldRow label="Cc">
             <input value={cc} onChange={e => setCc(e.target.value)} placeholder="Cc recipients"
@@ -217,7 +334,7 @@ export default function ComposeModal() {
       {attachments.length > 0 && (
         <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap gap-2 flex-shrink-0">
           {attachments.map((a, i) => (
-            <div key={i} className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2 py-1 text-xs">
+            <div key={i} className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 text-xs">
               <FileText size={12} className="text-blue-500 flex-shrink-0" />
               <span className="max-w-[120px] truncate text-[#202124]">{a.filename}</span>
               <span className="text-[#5f6368]">{formatBytes(a.size)}</span>
@@ -230,13 +347,13 @@ export default function ComposeModal() {
       )}
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2 flex-shrink-0">
+      <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-3 flex-shrink-0 bg-gray-50">
         <button
           onClick={() => mutation.mutate()}
           disabled={!to.trim() || isBodyEmpty || mutation.isPending}
-          className="btn-primary flex items-center gap-2 text-sm"
+          className="btn-primary flex items-center gap-2"
         >
-          <Send size={14} />
+          <Send size={15} />
           {mutation.isPending ? "Sending…" : "Send"}
         </button>
 
@@ -248,15 +365,16 @@ export default function ComposeModal() {
           onChange={e => handleFiles(e.target.files)}
         />
         <button
-          className="btn-ghost p-1.5"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"
           title="Attach file"
           onClick={() => fileInputRef.current?.click()}
         >
           <Paperclip size={15} />
+          <span className="text-xs">Attach</span>
         </button>
 
         <div className="flex-1" />
-        <button onClick={closeCompose} className="btn-ghost text-gray-400 p-1.5" title="Discard">
+        <button onClick={handleClose} className="btn-ghost text-gray-400 p-1.5" title="Discard">
           <X size={16} />
         </button>
       </div>
