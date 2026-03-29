@@ -28,6 +28,30 @@ interface Attachment {
   size: number;
 }
 
+function readFileAsBase64WithProgress(
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<{ base64: string; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const [, base64 = ""] = result.split(",");
+      resolve({
+        base64,
+        contentType: file.type || "application/octet-stream",
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function getKnownRecipients(): string[] {
   try { return JSON.parse(localStorage.getItem(RECIPIENTS_KEY) ?? "[]"); }
   catch { return []; }
@@ -66,6 +90,12 @@ export default function ComposeModal() {
   const [minimized, setMinimized]   = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentPrep, setAttachmentPrep] = useState<{ active: boolean; fileName: string; progress: number }>({
+    active: false,
+    fileName: "",
+    progress: 0,
+  });
+  const [sendUploadProgress, setSendUploadProgress] = useState<number | null>(null);
   const [toSuggestions, setToSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const knownRecipients = useRef(getKnownRecipients());
@@ -145,13 +175,30 @@ export default function ComposeModal() {
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files) return;
     const newAttachments: Attachment[] = [];
-    for (const file of Array.from(files)) {
-      const buf = await file.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      newAttachments.push({ filename: file.name, content: b64, contentType: file.type || "application/octet-stream", size: file.size });
+    const allFiles = Array.from(files);
+    setAttachmentPrep({ active: true, fileName: allFiles[0]?.name ?? "", progress: 0 });
+
+    for (let i = 0; i < allFiles.length; i++) {
+      const file = allFiles[i];
+      try {
+        const result = await readFileAsBase64WithProgress(file, (fileProgress) => {
+          const combinedProgress = Math.round(((i + fileProgress / 100) / allFiles.length) * 100);
+          setAttachmentPrep({ active: true, fileName: file.name, progress: combinedProgress });
+        });
+        newAttachments.push({
+          filename: file.name,
+          content: result.base64,
+          contentType: result.contentType,
+          size: file.size,
+        });
+      } catch {
+        addToast(`Failed to attach ${file.name}`, "error");
+      }
     }
+
     setAttachments(prev => [...prev, ...newAttachments]);
-  }, []);
+    setAttachmentPrep({ active: false, fileName: "", progress: 100 });
+  }, [addToast]);
 
   const removeAttachment = (idx: number) =>
     setAttachments(prev => prev.filter((_, i) => i !== idx));
@@ -167,9 +214,14 @@ export default function ComposeModal() {
         attachments: attachments.length
           ? attachments.map(a => ({ filename: a.filename, content: a.content, contentType: a.contentType }))
           : undefined,
+      }, (event) => {
+        if (event.total && event.total > 0) {
+          setSendUploadProgress(Math.round((event.loaded / event.total) * 100));
+        }
       });
     },
     onSuccess: () => {
+      setSendUploadProgress(null);
       saveRecipientsFromField(to);
       if (cc) saveRecipientsFromField(cc);
       localStorage.removeItem(DRAFT_KEY);
@@ -177,7 +229,10 @@ export default function ComposeModal() {
       addToast("Message sent!", "success");
       closeCompose();
     },
-    onError: () => addToast("Failed to send message. Please try again.", "error"),
+    onError: () => {
+      setSendUploadProgress(null);
+      addToast("Failed to send message. Please try again.", "error");
+    },
   });
 
   const setLink = useCallback(() => {
@@ -346,6 +401,34 @@ export default function ComposeModal() {
         </div>
       )}
 
+      {/* Upload progress */}
+      {(attachmentPrep.active || (mutation.isPending && sendUploadProgress !== null)) && (
+        <div className="px-4 py-2 border-t border-gray-100 bg-blue-50/50 flex-shrink-0 space-y-1.5">
+          {attachmentPrep.active && (
+            <>
+              <div className="flex items-center justify-between text-xs text-[#202124]">
+                <span className="truncate pr-2">Preparing attachment: {attachmentPrep.fileName}</span>
+                <span>{attachmentPrep.progress}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-blue-100 overflow-hidden">
+                <div className="h-full bg-blue-600 transition-all" style={{ width: `${attachmentPrep.progress}%` }} />
+              </div>
+            </>
+          )}
+          {mutation.isPending && sendUploadProgress !== null && (
+            <>
+              <div className="flex items-center justify-between text-xs text-[#202124]">
+                <span>Uploading email payload</span>
+                <span>{sendUploadProgress}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-emerald-100 overflow-hidden">
+                <div className="h-full bg-emerald-600 transition-all" style={{ width: `${sendUploadProgress}%` }} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-3 flex-shrink-0 bg-gray-50">
         <button
@@ -374,6 +457,9 @@ export default function ComposeModal() {
         </button>
 
         <div className="flex-1" />
+        <span className="text-[11px] text-[#5f6368] hidden sm:inline text-right max-w-[260px] leading-4">
+          Sent mails and attachments are saved in your mailbox Sent folder (IMAP).
+        </span>
         <button onClick={handleClose} className="btn-ghost text-gray-400 p-1.5" title="Discard">
           <X size={16} />
         </button>

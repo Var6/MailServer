@@ -5,11 +5,12 @@
 
 @layer base {
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --app-bg: #eef2ff; }
   html {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  body { @apply bg-[#eef2ff] text-[#202124] text-sm; }
+  body { background: var(--app-bg); @apply text-[#202124] text-sm; }
 }
 
 @layer components {
@@ -53,7 +54,7 @@
     @apply bg-blue-600 text-white;
   }
   .skeleton {
-    @apply animate-pulse bg-gray-200 rounded;
+    @apply animate-pulse bg-gray-300 rounded;
   }
   .field-input {
     @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#202124]

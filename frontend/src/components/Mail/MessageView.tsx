@@ -5,7 +5,8 @@ import {
   Paperclip, ChevronDown, ExternalLink, Printer, Archive,
   CornerUpLeft, RotateCcw, X, MailOpen,
 } from "lucide-react";
-import { getMessage, flagMessage, deleteMessage, moveMessage, permanentDeleteMessage } from "../../api/mailApi.ts";
+import { getMessage, flagMessage, deleteMessage, moveMessage, permanentDeleteMessage, downloadAttachment, openAttachmentOnline } from "../../api/mailApi.ts";
+import { apiClient } from "../../api/client.ts";
 import { useMailStore, useToastStore, useAuthStore } from "../../store/index.ts";
 import { formatFullDate, avatarColor, senderInitial, senderName } from "../../lib/utils.ts";
 import { MessageSkeleton } from "../ui/Skeleton.tsx";
@@ -18,6 +19,49 @@ export default function MessageView() {
   const qc = useQueryClient();
   const [showDetails, setShowDetails] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const OFFICE_TYPES = new Set(["doc", "docx", "odt", "xls", "xlsx", "ods", "ppt", "pptx", "odp"]);
+  const isOfficeFile = (name: string) => OFFICE_TYPES.has(name.split(".").pop()?.toLowerCase() ?? "");
+
+  const openNextcloud = async (redirect: string) => {
+    try {
+      const { data } = await apiClient.post<{ token: string }>("/files/nc-login", { redirect });
+      window.open(`/api/files/nc-redirect?token=${data.token}`, "_blank");
+    } catch {
+      window.open(`/nextcloud${redirect}`, "_blank");
+    }
+  };
+
+  const openAttachmentMutation = useMutation({
+    mutationFn: ({ index, filename }: { index: number; filename: string }) =>
+      openAttachmentOnline(selectedUid!, selectedFolder, index).then(async (data) => {
+        await openNextcloud(data.redirect);
+        return { ...data, filename };
+      }),
+    onSuccess: (data) => {
+      addToast(`Opened ${data.filename} in online editor`, "success");
+    },
+    onError: () => {
+      addToast("Could not open attachment in online editor", "error");
+    },
+  });
+
+  const downloadAttachmentMutation = useMutation({
+    mutationFn: async ({ index, filename }: { index: number; filename: string }) => {
+      const data = await downloadAttachment(selectedUid!, selectedFolder, index);
+      const url = URL.createObjectURL(data.blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return filename;
+    },
+    onSuccess: (filename) => addToast(`Downloaded ${filename}`, "success"),
+    onError: () => addToast("Attachment download failed", "error"),
+  });
 
   const { data: msg, isLoading } = useQuery({
     queryKey: ["message", selectedFolder, selectedUid],
@@ -287,14 +331,32 @@ export default function MessageView() {
                   <div
                     key={i}
                     className="flex items-center gap-2.5 border border-gray-200 hover:border-gray-300
-                               rounded-xl px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors group"
+                               rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors group"
                   >
                     <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Paperclip size={15} className="text-blue-600" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs font-medium text-[#202124] max-w-[160px] truncate">{att.filename}</p>
                       <p className="text-xs text-[#5f6368]">{formatBytes(att.size)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button
+                        onClick={() => downloadAttachmentMutation.mutate({ index: i, filename: att.filename })}
+                        className="text-xs px-2 py-1 rounded-md border border-gray-200 hover:bg-white text-[#202124]"
+                        disabled={downloadAttachmentMutation.isPending}
+                      >
+                        Download
+                      </button>
+                      {isOfficeFile(att.filename) && (
+                        <button
+                          onClick={() => openAttachmentMutation.mutate({ index: i, filename: att.filename })}
+                          disabled={openAttachmentMutation.isPending}
+                          className="text-xs px-2 py-1 rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                        >
+                          {openAttachmentMutation.isPending ? "Opening..." : "Edit Online"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

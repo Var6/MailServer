@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Mail, Calendar, Users, Folder, LogOut, Inbox, Send,
@@ -10,9 +10,11 @@ import { logout } from "../../api/authApi.ts";
 import { getFolders } from "../../api/mailApi.ts";
 import { avatarColor } from "../../lib/utils.ts";
 import { useState } from "react";
+import type { MailFolder } from "../../types/index.ts";
+import { folderToSlug, getDefaultMailRoute } from "../../lib/mailFolders.ts";
 
 const USER_NAV = [
-  { to: "/inbox",    icon: Mail,      label: "Mail"     },
+  { to: getDefaultMailRoute(), icon: Mail, label: "Mail" },
   { to: "/calendar", icon: Calendar,  label: "Calendar" },
   { to: "/contacts", icon: Users,     label: "Contacts" },
   { to: "/files",    icon: Folder,    label: "Files"    },
@@ -20,7 +22,7 @@ const USER_NAV = [
 
 const ADMIN_NAV = [
   { to: "/admin/users", icon: UserCog, label: "Users"    },
-  { to: "/inbox",       icon: Mail,    label: "Mail"     },
+  { to: getDefaultMailRoute(), icon: Mail, label: "Mail" },
   { to: "/calendar",    icon: Calendar,label: "Calendar" },
   { to: "/files",       icon: Folder,  label: "Files"    },
 ];
@@ -48,11 +50,27 @@ const FALLBACK_FOLDERS = [
   { path: "Trash",   name: "Trash"   },
 ];
 
+type SpecialKey = "INBOX" | "Sent" | "Drafts" | "Junk" | "Trash" | "Archive";
+
+function detectSpecialFolder(folder: MailFolder | { path: string; name: string; specialUse?: string }): SpecialKey | null {
+  const special = (folder.specialUse ?? "").toLowerCase();
+  const hay = `${folder.name} ${folder.path}`.toLowerCase();
+
+  if (special.includes("\\inbox") || hay === "inbox") return "INBOX";
+  if (special.includes("\\sent") || /(^|\b)(sent|sent items|sent mail)(\b|$)/i.test(hay)) return "Sent";
+  if (special.includes("\\drafts") || /(^|\b)(draft|drafts)(\b|$)/i.test(hay)) return "Drafts";
+  if (special.includes("\\junk") || /(^|\b)(junk|spam)(\b|$)/i.test(hay)) return "Junk";
+  if (special.includes("\\trash") || /(^|\b)(trash|bin|deleted)(\b|$)/i.test(hay)) return "Trash";
+  if (special.includes("\\archive") || /(^|\b)(archive|all mail)(\b|$)/i.test(hay)) return "Archive";
+  return null;
+}
+
 export default function Sidebar() {
   const { email, displayName, role, clearAuth } = useAuthStore();
   const { selectedFolder, setFolder, openCompose } = useMailStore();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
-  const isMailRoute = pathname.startsWith("/inbox");
+  const isMailRoute = pathname.startsWith("/mail") || pathname.startsWith("/inbox");
   const [moreOpen, setMoreOpen] = useState(false);
 
   const { data: folders = [] } = useQuery({
@@ -78,12 +96,34 @@ export default function Sidebar() {
                  : role === "admin"      ? ADMIN_NAV
                  : USER_NAV;
 
-  // Use fallback folders while loading or if the API failed — always show something
-  const effectiveFolders = folders.length > 0 ? folders : FALLBACK_FOLDERS;
+  // Use fallback folders while loading, and merge standard folders if IMAP returns only partial list.
+  const effectiveFolders = (() => {
+    if (folders.length === 0) return FALLBACK_FOLDERS;
+    const merged = [...folders];
+    const seen = new Set<SpecialKey>();
+    for (const folder of folders) {
+      const key = detectSpecialFolder(folder);
+      if (key) seen.add(key);
+    }
+    for (const fallback of FALLBACK_FOLDERS) {
+      const key = detectSpecialFolder(fallback as MailFolder);
+      if (key && !seen.has(key)) {
+        merged.push(fallback as MailFolder);
+      }
+    }
+    return merged;
+  })();
+  const specialSeen = new Set<SpecialKey>();
   const mainFolders = effectiveFolders
-    .filter(f => SPECIAL_MAP[f.name])
-    .sort((a, b) => (SPECIAL_MAP[a.name]?.order ?? 99) - (SPECIAL_MAP[b.name]?.order ?? 99));
-  const otherFolders = folders.filter(f => !SPECIAL_MAP[f.name]);
+    .map(f => ({ folder: f, special: detectSpecialFolder(f) }))
+    .filter((x): x is { folder: typeof effectiveFolders[number]; special: SpecialKey } => !!x.special)
+    .filter((x) => {
+      if (specialSeen.has(x.special)) return false;
+      specialSeen.add(x.special);
+      return true;
+    })
+    .sort((a, b) => (SPECIAL_MAP[a.special].order ?? 99) - (SPECIAL_MAP[b.special].order ?? 99));
+  const otherFolders = effectiveFolders.filter(f => !detectSpecialFolder(f));
 
   return (
     <aside className="w-64 bg-white flex flex-col h-full border-r border-gray-200 select-none shadow-sm">
@@ -129,13 +169,16 @@ export default function Sidebar() {
         {isMailRoute && role !== "superadmin" && (
           <div className="mt-2 border-t border-gray-100 pt-2">
             {mainFolders.map(f => {
-              const meta = SPECIAL_MAP[f.name];
+              const meta = SPECIAL_MAP[f.special];
               const Icon = meta.icon;
-              const active = selectedFolder === f.path;
+              const active = selectedFolder === f.folder.path;
               return (
                 <button
-                  key={f.path}
-                  onClick={() => setFolder(f.path)}
+                  key={f.folder.path}
+                  onClick={() => {
+                    setFolder(f.folder.path);
+                    navigate(`/mail/${folderToSlug(f.folder.path)}`);
+                  }}
                   className={`folder-btn ${active ? "folder-btn-active" : ""}`}
                 >
                   <Icon size={18} />
@@ -156,7 +199,10 @@ export default function Sidebar() {
                 {moreOpen && otherFolders.map(f => (
                   <button
                     key={f.path}
-                    onClick={() => setFolder(f.path)}
+                    onClick={() => {
+                      setFolder(f.path);
+                      navigate(`/mail/${folderToSlug(f.path)}`);
+                    }}
                     className={`folder-btn pl-8 ${selectedFolder === f.path ? "folder-btn-active" : ""}`}
                   >
                     <Folder size={16} />

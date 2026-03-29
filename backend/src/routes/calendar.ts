@@ -44,6 +44,8 @@ const eventSchema = z.object({
   allDay:      z.boolean().default(false),
   description: z.string().optional(),
   color:       z.string().optional(),
+  meetingLink: z.string().url().optional(),
+  reminderMinutesBefore: z.number().int().min(0).max(10080).optional(),
 });
 
 router.post("/shared", async (req, res, next) => {
@@ -81,6 +83,8 @@ router.patch("/shared/:id", async (req, res, next) => {
       allDay:      z.boolean().optional(),
       description: z.string().optional(),
       color:       z.string().optional(),
+      meetingLink: z.string().url().optional(),
+      reminderMinutesBefore: z.number().int().min(0).max(10080).optional(),
     }).parse(req.body);
 
     Object.assign(event, patch);

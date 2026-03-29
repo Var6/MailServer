@@ -55,7 +55,18 @@ async function openInCollabora(filePath: string) {
 export default function FilesPage() {
   const [path, setPath]           = useState("/");
   const [breadcrumbs, setBreadcrumbs] = useState<string[]>([]);
+  const [uploadQueue, setUploadQueue] = useState<Array<{
+    name: string;
+    progress: number;
+    status: "uploading" | "done" | "error";
+  }>>([]);
   const { addToast }              = useToastStore();
+
+  const { data: storageInfo } = useQuery({
+    queryKey: ["files-storage-info"],
+    queryFn: () => apiClient.get("/files/storage-info").then(r => r.data as { driver: "local" | "nextcloud"; location: string }),
+    retry: false,
+  });
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["files", path],
@@ -77,17 +88,40 @@ export default function FilesPage() {
   };
 
   const onDrop = useCallback(async (files: File[]) => {
+    setUploadQueue(files.map((file) => ({ name: file.name, progress: 0, status: "uploading" })));
+
+    const updateUpload = (name: string, patch: Partial<{ progress: number; status: "uploading" | "done" | "error" }>) => {
+      setUploadQueue((prev) => prev.map((entry) => (
+        entry.name === name ? { ...entry, ...patch } : entry
+      )));
+    };
+
     for (const file of files) {
       try {
         const buf = await file.arrayBuffer();
         await apiClient.post(`/files/upload?path=${encodeURIComponent(path + file.name)}`, buf, {
           headers: { "Content-Type": file.type || "application/octet-stream" },
+          onUploadProgress: (event) => {
+            if (event.total && event.total > 0) {
+              updateUpload(file.name, {
+                progress: Math.round((event.loaded / event.total) * 100),
+                status: "uploading",
+              });
+            }
+          },
         });
+        updateUpload(file.name, { progress: 100, status: "done" });
         addToast(`Uploaded ${file.name}`, "success");
       } catch {
+        updateUpload(file.name, { status: "error" });
         addToast(`Failed to upload ${file.name}`, "error");
       }
     }
+
+    setTimeout(() => {
+      setUploadQueue((prev) => prev.filter((entry) => entry.status !== "done"));
+    }, 1800);
+
     refetch();
   }, [path, refetch, addToast]);
 
@@ -134,10 +168,41 @@ export default function FilesPage() {
             className="flex items-center gap-1.5 text-sm text-[#5f6368] hover:text-[#202124]
                        border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-colors"
           >
-            Open Nextcloud <ExternalLink size={12} />
+            Open LibreOffice <ExternalLink size={12} />
           </button>
         </div>
       </div>
+
+      <div className="px-6 py-2 border-b border-gray-100 bg-gray-50 text-xs text-[#5f6368]">
+        {storageInfo?.driver === "local"
+          ? (
+            <>Files are stored on this system at <span className="font-medium text-[#202124]">{storageInfo.location}{path}</span>. LibreOffice web editor is available via Nextcloud.</>
+          )
+          : (
+            <>Files are stored in Nextcloud at <span className="font-medium text-[#202124]">{storageInfo?.location ?? "/remote.php/dav/files/<your-email>/"}{path}</span></>
+          )}
+      </div>
+
+      {uploadQueue.length > 0 && (
+        <div className="px-6 py-3 border-b border-gray-100 bg-blue-50/50 space-y-2">
+          {uploadQueue.map((upload) => (
+            <div key={upload.name}>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#202124] truncate pr-2">{upload.name}</span>
+                <span className={upload.status === "error" ? "text-red-600" : "text-[#5f6368]"}>
+                  {upload.status === "error" ? "Failed" : `${upload.progress}%`}
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-blue-100 overflow-hidden mt-1">
+                <div
+                  className={`h-full transition-all ${upload.status === "error" ? "bg-red-500" : "bg-blue-600"}`}
+                  style={{ width: `${upload.progress}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Drop overlay */}
       {isDragActive && (
@@ -187,7 +252,7 @@ export default function FilesPage() {
               >
                 <div className="mb-2 relative">
                   <FileIcon name={file.name} contentType={file.contentType} isDir={file.isDirectory} />
-                  {!file.isDirectory && isOfficeFile(file.name) && (
+                  {!file.isDirectory && isOfficeFile(file.name) && storageInfo?.driver === "nextcloud" && (
                     <button
                       onClick={e => { e.stopPropagation(); openInCollabora(path + file.name); }}
                       className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center

@@ -2,6 +2,7 @@ import { Router } from "express";
 import axios from "axios";
 import { requireAuth } from "../middleware/auth.js";
 import { listFiles, uploadFile, provisionUser } from "../services/nextcloudService.js";
+import { listLocalFiles, localStorageLocation, uploadLocalFile } from "../services/localFileService.js";
 import { config } from "../config/index.js";
 
 const router = Router();
@@ -44,23 +45,36 @@ router.get("/nc-redirect", (req, res) => {
 // ── Authenticated routes ───────────────────────────────────────────────────────
 router.use(requireAuth);
 
-router.use((_req, res, next) => {
-  if (!process.env.NEXTCLOUD_URL) {
-    res.status(503).json({ error: "Nextcloud not configured in this deployment." });
+// GET /files/storage-info
+router.get("/storage-info", (req, res) => {
+  const driver = config.FILE_STORAGE_DRIVER;
+  if (driver === "local") {
+    const hostBase = config.LOCAL_FILES_HOST_PATH;
+    const location = hostBase
+      ? `${hostBase.replace(/[\\/]+$/, "")}/${req.user!.sub}`
+      : localStorageLocation(req.user!.sub);
+    res.json({ driver, location });
     return;
   }
-  next();
+  res.json({ driver, location: `/remote.php/dav/files/${encodeURIComponent(req.user!.sub)}/` });
 });
 
 // GET /files?path=/
 router.get("/", async (req, res, next) => {
   try {
     const email    = req.user!.sub;
-    const password = req.userPassword!;
     const path     = (req.query.path as string) || "/";
-    // Ensure NC user exists and password is synced before every WebDAV call
-    await provisionUser(email, password).catch(() => {});
-    const files = await listFiles(email, password, path);
+    let files;
+
+    if (config.FILE_STORAGE_DRIVER === "local") {
+      files = await listLocalFiles(email, path);
+    } else {
+      const password = req.userPassword!;
+      // Ensure NC user exists and password is synced before every WebDAV call
+      await provisionUser(email, password).catch(() => {});
+      files = await listFiles(email, password, path);
+    }
+
     res.json(files);
   } catch (e) { next(e); }
 });
@@ -75,7 +89,11 @@ router.post("/upload", async (req, res, next) => {
     req.on("end", async () => {
       try {
         const content = Buffer.concat(chunks);
-        await uploadFile(req.user!.sub, req.userPassword!, path, content, contentType);
+        if (config.FILE_STORAGE_DRIVER === "local") {
+          await uploadLocalFile(req.user!.sub, path, content);
+        } else {
+          await uploadFile(req.user!.sub, req.userPassword!, path, content, contentType);
+        }
         res.json({ ok: true });
       } catch (e) { next(e); }
     });

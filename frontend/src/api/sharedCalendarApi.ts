@@ -9,6 +9,8 @@ export interface SharedEvent {
   allDay: boolean;
   description?: string;
   color?: string;
+  meetingLink?: string;
+  reminderMinutesBefore?: number;
   createdBy: string;
   createdAt: string;
 }
@@ -23,6 +25,8 @@ export const createSharedEvent = (payload: {
   allDay?: boolean;
   description?: string;
   color?: string;
+  meetingLink?: string;
+  reminderMinutesBefore?: number;
 }) => apiClient.post<SharedEvent>("/calendar/shared", payload).then(r => r.data);
 
 export const deleteSharedEvent = (id: string) =>

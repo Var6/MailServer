@@ -8,6 +8,8 @@ export interface ISharedEvent extends Document {
   allDay: boolean;
   description?: string;
   color?: string;
+  meetingLink?: string;
+  reminderMinutesBefore?: number;
   createdBy: string;      // user email
   createdAt: Date;
 }
@@ -20,6 +22,8 @@ const SharedEventSchema = new Schema<ISharedEvent>({
   allDay:       { type: Boolean, default: false },
   description:  { type: String },
   color:        { type: String, default: "#1a73e8" },
+  meetingLink:  { type: String },
+  reminderMinutesBefore: { type: Number, min: 0, max: 10080, default: 15 },
   createdBy:    { type: String, required: true },
   createdAt:    { type: Date, default: Date.now },
 });

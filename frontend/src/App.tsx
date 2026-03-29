@@ -12,6 +12,7 @@ import TenantsPage         from "./pages/superadmin/Tenants.tsx";
 import BillingPage         from "./pages/superadmin/Billing.tsx";
 import AdminUsersPage      from "./pages/admin/Users.tsx";
 import Layout              from "./components/Layout/Layout.tsx";
+import { getDefaultMailRoute } from "./lib/mailFolders.ts";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = useAuthStore(s => s.accessToken);
@@ -20,7 +21,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 function RequireRole({ roles, children }: { roles: UserRole[]; children: JSX.Element }) {
   const role = useAuthStore(s => s.role);
-  if (!role || !roles.includes(role)) return <Navigate to="/inbox" replace />;
+  if (!role || !roles.includes(role)) return <Navigate to={getDefaultMailRoute()} replace />;
   return children;
 }
 
@@ -45,7 +46,9 @@ export default function App() {
           }
         >
           {/* Regular user routes */}
-          <Route path="inbox"    element={<InboxPage />} />
+          <Route path="inbox"    element={<Navigate to={getDefaultMailRoute()} replace />} />
+          <Route path="mail"     element={<Navigate to={getDefaultMailRoute()} replace />} />
+          <Route path="mail/:folder" element={<InboxPage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="contacts" element={<ContactsPage />} />
           <Route path="files"    element={<FilesPage />} />
@@ -78,6 +81,8 @@ export default function App() {
             }
           />
         </Route>
+
+        <Route path="*" element={<Navigate to={getDefaultMailRoute()} replace />} />
       </Routes>
     </BrowserRouter>
   );

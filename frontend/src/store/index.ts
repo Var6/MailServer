@@ -103,3 +103,19 @@ export const useToastStore = create<ToastState>()((set) => ({
   },
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 }));
+
+// ── UI Theme Store ────────────────────────────────────────
+interface UiThemeState {
+  appBg: string;
+  setAppBg: (color: string) => void;
+}
+
+export const useUiThemeStore = create<UiThemeState>()(
+  persist(
+    (set) => ({
+      appBg: "#eef2ff",
+      setAppBg: (appBg) => set({ appBg }),
+    }),
+    { name: "ui-theme" }
+  )
+);

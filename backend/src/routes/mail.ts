@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
+import path from "path";
 import { requireAuth } from "../middleware/auth.js";
 import * as imap from "../services/imapService.js";
 import { sendMail } from "../services/smtpService.js";
+import { provisionUser, uploadFile } from "../services/nextcloudService.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -43,6 +45,64 @@ router.get("/messages/:uid", async (req, res, next) => {
     const msg    = await imap.fetchMessage(req.user!.sub, req.userPassword!, folder, uid);
     if (!msg) { res.status(404).json({ error: "Message not found" }); return; }
     res.json(msg);
+  } catch (e) { next(e); }
+});
+
+// GET /mail/messages/:uid/attachments/:index/download?folder=INBOX
+router.get("/messages/:uid/attachments/:index/download", async (req, res, next) => {
+  try {
+    const uid = parseInt(req.params.uid, 10);
+    const index = parseInt(req.params.index, 10);
+    const folder = (req.query.folder as string) || "INBOX";
+
+    if (Number.isNaN(uid) || Number.isNaN(index) || index < 0) {
+      res.status(400).json({ error: "Invalid uid or attachment index" });
+      return;
+    }
+
+    const attachment = await imap.fetchAttachment(req.user!.sub, req.userPassword!, folder, uid, index);
+    if (!attachment) {
+      res.status(404).json({ error: "Attachment not found" });
+      return;
+    }
+
+    res.setHeader("Content-Type", attachment.contentType || "application/octet-stream");
+    res.setHeader("Content-Length", attachment.size.toString());
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(attachment.filename)}"`);
+    res.send(attachment.content);
+  } catch (e) { next(e); }
+});
+
+// POST /mail/messages/:uid/attachments/:index/edit-online
+router.post("/messages/:uid/attachments/:index/edit-online", async (req, res, next) => {
+  try {
+    const uid = parseInt(req.params.uid, 10);
+    const index = parseInt(req.params.index, 10);
+    const folder = ((req.body as { folder?: string })?.folder as string) || "INBOX";
+
+    if (Number.isNaN(uid) || Number.isNaN(index) || index < 0) {
+      res.status(400).json({ error: "Invalid uid or attachment index" });
+      return;
+    }
+
+    const email = req.user!.sub;
+    const password = req.userPassword!;
+    const attachment = await imap.fetchAttachment(email, password, folder, uid, index);
+    if (!attachment) {
+      res.status(404).json({ error: "Attachment not found" });
+      return;
+    }
+
+    const safeFilename = attachment.filename.replace(/[\\/:*?"<>|]/g, "_");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const targetPath = `/Mail Attachments/${stamp}-${safeFilename}`;
+
+    await provisionUser(email, password).catch(() => {});
+    await uploadFile(email, password, targetPath, attachment.content, attachment.contentType);
+
+    const dir = path.posix.dirname(targetPath);
+    const redirect = `/index.php/apps/files/?dir=${encodeURIComponent(dir)}&openfile=${encodeURIComponent(targetPath)}`;
+    res.json({ ok: true, targetPath, redirect, filename: attachment.filename });
   } catch (e) { next(e); }
 });
 

@@ -1,12 +1,12 @@
 import axios from "axios";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import type { EventApi, DateSelectArg, EventClickArg } from "@fullcalendar/core";
-import { Users, User, Plus, Trash2, X } from "lucide-react";
+import { Users, User, Plus, Trash2, X, Video, Bell } from "lucide-react";
 import { getSharedEvents, createSharedEvent, deleteSharedEvent, type SharedEvent } from "../api/sharedCalendarApi.ts";
 import { useToastStore, useAuthStore } from "../store/index.ts";
 
@@ -86,6 +86,7 @@ function TeamCalendar() {
   const { email: selfEmail, role } = useAuthStore();
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<SharedEvent | null>(null);
+  const reminderTimers = useRef<number[]>([]);
 
   const { data: events = [] } = useQuery({
     queryKey: ["shared-events"],
@@ -115,6 +116,39 @@ function TeamCalendar() {
 
   const canDelete = (e: SharedEvent) =>
     e.createdBy === selfEmail || role === "admin" || role === "superadmin";
+
+  useEffect(() => {
+    reminderTimers.current.forEach((id) => window.clearTimeout(id));
+    reminderTimers.current = [];
+
+    if (typeof window === "undefined") return;
+
+    for (const event of events) {
+      const reminderMinutes = event.reminderMinutesBefore ?? 0;
+      if (reminderMinutes <= 0) continue;
+
+      const startMs = new Date(event.start).getTime();
+      const reminderAt = startMs - reminderMinutes * 60_000;
+      const delay = reminderAt - Date.now();
+
+      if (delay <= 0 || delay > 24 * 60 * 60_000) continue;
+
+      const id = window.setTimeout(() => {
+        addToast(`Reminder: ${event.title} starts in ${reminderMinutes} min`, "info");
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Meeting Reminder", {
+            body: `${event.title} starts in ${reminderMinutes} minutes`,
+          });
+        }
+      }, delay);
+      reminderTimers.current.push(id);
+    }
+
+    return () => {
+      reminderTimers.current.forEach((id) => window.clearTimeout(id));
+      reminderTimers.current = [];
+    };
+  }, [events, addToast]);
 
   return (
     <div className="h-full flex flex-col p-4">
@@ -153,6 +187,21 @@ function TeamCalendar() {
               {!selected.allDay && ` · ${new Date(selected.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
             </p>
             {selected.description && <p className="text-sm text-[#202124] mt-2">{selected.description}</p>}
+            {selected.meetingLink && (
+              <a
+                href={selected.meetingLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 text-xs text-blue-700 hover:text-blue-800"
+              >
+                <Video size={13} /> Join free meeting room
+              </a>
+            )}
+            {(selected.reminderMinutesBefore ?? 0) > 0 && (
+              <p className="text-xs text-[#5f6368] mt-2 flex items-center gap-1">
+                <Bell size={12} /> Reminder: {selected.reminderMinutesBefore} minutes before
+              </p>
+            )}
             <p className="text-xs text-gray-400 mt-2">Added by {selected.createdBy}</p>
             {canDelete(selected) && (
               <button
@@ -180,7 +229,22 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({
     title: "", start: today, end: today,
     allDay: false, description: "", color: "#0b8043",
+    meetingLink: "",
+    reminderMinutesBefore: "15",
   });
+
+  const ensureNotificationPermission = async () => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+  };
+
+  const createJitsiLink = () => {
+    const slugBase = (form.title || "team-meeting").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const stamp = Date.now().toString(36);
+    set("meetingLink", `https://meet.jit.si/${slugBase || "meeting"}-${stamp}`);
+  };
 
   const mutation = useMutation({
     mutationFn: createSharedEvent,
@@ -203,7 +267,20 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400"><X size={16} /></button>
         </div>
         <form
-          onSubmit={e => { e.preventDefault(); mutation.mutate({ title: form.title, start: form.start, end: form.end, allDay: form.allDay, description: form.description || undefined, color: form.color }); }}
+          onSubmit={e => {
+            e.preventDefault();
+            void ensureNotificationPermission();
+            mutation.mutate({
+              title: form.title,
+              start: form.start,
+              end: form.end,
+              allDay: form.allDay,
+              description: form.description || undefined,
+              color: form.color,
+              meetingLink: form.meetingLink || undefined,
+              reminderMinutesBefore: parseInt(form.reminderMinutesBefore, 10) || 0,
+            });
+          }}
           className="p-6 space-y-4"
         >
           <div className="space-y-1">
@@ -230,6 +307,35 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
           <div className="space-y-1">
             <label className="text-xs font-medium text-[#5f6368]">Description</label>
             <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={2} className="field-input resize-none" placeholder="Optional details…" />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[#5f6368]">Meeting link (free alternative to Google Meet)</label>
+            <div className="flex gap-2">
+              <input
+                value={form.meetingLink}
+                onChange={e => set("meetingLink", e.target.value)}
+                className="field-input"
+                placeholder="https://meet.jit.si/..."
+              />
+              <button type="button" onClick={createJitsiLink} className="btn-ghost whitespace-nowrap">Generate</button>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[#5f6368]">Reminder</label>
+            <select
+              value={form.reminderMinutesBefore}
+              onChange={e => set("reminderMinutesBefore", e.target.value)}
+              className="field-input"
+            >
+              <option value="0">No reminder</option>
+              <option value="5">5 minutes before</option>
+              <option value="10">10 minutes before</option>
+              <option value="15">15 minutes before</option>
+              <option value="30">30 minutes before</option>
+              <option value="60">1 hour before</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-2">

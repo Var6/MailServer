@@ -200,6 +200,37 @@ export async function fetchMessage(
   });
 }
 
+export async function fetchAttachment(
+  email: string,
+  password: string,
+  folder: string,
+  uid: number,
+  attachmentIndex: number
+): Promise<{ filename: string; contentType: string; content: Buffer; size: number } | null> {
+  return withClient(email, password, async (client) => {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      for await (const msg of client.fetch({ uid }, {
+        source: true,
+      })) {
+        const parsed = await simpleParser(msg.source ?? Buffer.alloc(0));
+        const attachments = parsed.attachments ?? [];
+        const attachment = attachments[attachmentIndex];
+        if (!attachment || !attachment.content) return null;
+        return {
+          filename: attachment.filename ?? `attachment-${attachmentIndex + 1}`,
+          contentType: attachment.contentType || "application/octet-stream",
+          content: attachment.content,
+          size: attachment.size ?? attachment.content.length,
+        };
+      }
+      return null;
+    } finally {
+      lock.release();
+    }
+  });
+}
+
 export async function moveMessage(
   email: string,
   password: string,
@@ -283,9 +314,19 @@ export async function appendToSent(
     body,
   ].join("\r\n");
   try {
-    await withClient(email, password, (client) =>
-      client.append("Sent", Buffer.from(raw), ["\\Seen"])
-    );
+    await withClient(email, password, async (client) => {
+      const mailboxes = await client.list();
+      const sentBySpecial = mailboxes.find((m) => (m.specialUse ?? "").toLowerCase().includes("\\sent"));
+      const sentByName = mailboxes.find((m) => /(^|\b)(sent|sent items|sent mail)(\b|$)/i.test(`${m.name} ${m.path}`));
+      const sentPath = sentBySpecial?.path ?? sentByName?.path ?? "Sent";
+
+      try {
+        await client.append(sentPath, Buffer.from(raw), ["\\Seen"]);
+      } catch {
+        await client.mailboxCreate("Sent").catch(() => {});
+        await client.append("Sent", Buffer.from(raw), ["\\Seen"]);
+      }
+    });
   } catch {
     // Non-fatal: don't fail the send if Sent append fails
   }
