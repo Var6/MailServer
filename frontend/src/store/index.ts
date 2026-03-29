@@ -46,10 +46,14 @@ interface ReplyContext {
 interface MailState {
   selectedFolder: string;
   selectedUid: number | null;
+  selectedUids: Set<number>;
   composeOpen: boolean;
   replyTo: ReplyContext | null;
   setFolder: (folder: string) => void;
   selectMessage: (uid: number | null) => void;
+  toggleSelectUid: (uid: number) => void;
+  selectAllUids: (uids: number[]) => void;
+  clearSelection: () => void;
   openCompose: (replyTo?: ReplyContext | null) => void;
   closeCompose: () => void;
 }
@@ -57,10 +61,18 @@ interface MailState {
 export const useMailStore = create<MailState>()((set) => ({
   selectedFolder: "INBOX",
   selectedUid: null,
+  selectedUids: new Set<number>(),
   composeOpen: false,
   replyTo: null,
-  setFolder: (selectedFolder) => set({ selectedFolder, selectedUid: null }),
+  setFolder: (selectedFolder) => set({ selectedFolder, selectedUid: null, selectedUids: new Set() }),
   selectMessage: (selectedUid) => set({ selectedUid }),
+  toggleSelectUid: (uid) => set(s => {
+    const next = new Set(s.selectedUids);
+    if (next.has(uid)) next.delete(uid); else next.add(uid);
+    return { selectedUids: next };
+  }),
+  selectAllUids: (uids) => set({ selectedUids: new Set(uids) }),
+  clearSelection: () => set({ selectedUids: new Set() }),
   openCompose: (replyTo = null) => set({ composeOpen: true, replyTo }),
   closeCompose: () => set({ composeOpen: false, replyTo: null }),
 }));
