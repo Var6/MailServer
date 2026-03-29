@@ -335,9 +335,14 @@ export default function MessageView() {
           <div className="text-sm leading-relaxed" style={{ color: textColor }}>
             {msg.html ? (
               <div
-                className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline email-body-render"
-                dangerouslySetInnerHTML={{ __html: sanitize(msg.html) }}
-              />
+                className="rounded-lg overflow-hidden"
+                style={{ backgroundColor: "#ffffff", color: "#202124" }}
+              >
+                <div
+                  className="p-4 prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline"
+                  dangerouslySetInnerHTML={{ __html: sanitize(msg.html) }}
+                />
+              </div>
             ) : (
               <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{msg.text}</pre>
             )}

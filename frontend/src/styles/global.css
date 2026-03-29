@@ -82,10 +82,7 @@
 .ProseMirror a { @apply text-blue-600 underline; }
 .ProseMirror strong { @apply font-semibold; }
 
-/* Email body rendering — neutralize any unexpected background set by sender */
-.email-body-render {
-  background: transparent !important;
-}
+/* Email body is rendered inside a white #fff wrapper — tables and images still need capping */
 .email-body-render table { max-width: 100% !important; }
 .email-body-render img { max-width: 100% !important; height: auto !important; }
 
