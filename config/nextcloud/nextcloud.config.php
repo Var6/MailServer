@@ -28,9 +28,9 @@ $CONFIG = [
   'mail_domain'      => getenv('MAIL_DOMAIN') ?: 'localhost',
 
   // Collabora / LibreOffice Online
-  // Nextcloud tells the browser to load Collabora from SERVER_URL
-  // e.g. https://223.235.102.35/browser/... and wss://.../cool/.../ws
-  // Set in Nextcloud admin UI: Apps → Collabora Online → server URL = SERVER_URL
+  // wopi_url is the public URL where the browser reaches Collabora (via nginx proxy).
+  // Both wopi_url and public_wopi_url must equal SERVER_URL.
+  // This is set here so it survives container restarts without needing occ commands.
   'allow_local_remote_servers' => true,
 
   'default_phone_region'          => 'IN',

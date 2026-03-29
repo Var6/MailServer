@@ -157,10 +157,10 @@ export default function InboxList() {
             title="Select all"
             className="w-4 h-4 rounded accent-blue-600 cursor-pointer flex-shrink-0 disabled:opacity-30"
           />
-          <div className="flex-1">
+          <div className="flex-1 flex items-center gap-2">
             <span className="font-semibold text-[#202124] text-sm">{selectedFolder}</span>
             {total > 0 && (
-              <span className="ml-2 text-xs text-gray-400 font-normal">{total}</span>
+              <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 font-normal" title={`${total} messages`}>{total}</span>
             )}
           </div>
           <button
@@ -227,6 +227,15 @@ export default function InboxList() {
                 toggleSelectUid(msg.uid);
               } else {
                 selectMessage(msg.uid);
+                // Optimistically mark as read in the cache so the dot disappears immediately
+                if (!msg.seen) {
+                  qc.setQueryData(
+                    ["messages", selectedFolder, 1],
+                    (old: typeof data) => old
+                      ? { ...old, messages: old.messages.map(m => m.uid === msg.uid ? { ...m, seen: true } : m) }
+                      : old
+                  );
+                }
               }
             }}
             onCheck={(e) => {
@@ -269,12 +278,10 @@ function MailItem({
         ${!checked && !selected && !msg.seen ? "mail-item-unread hover:bg-blue-50" : ""}
       `}
     >
-      {/* Unread indicator */}
-      {!msg.seen && !selected && !checked && (
-        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-600 rounded-full" />
-      )}
+      {/* Unread dot — inline flex item, always takes space; blue only when truly unread */}
+      <div className={`w-2 h-2 rounded-full flex-shrink-0 mr-1.5 ${(!msg.seen && !selected && !checked) ? "bg-blue-600" : "bg-transparent"}`} />
 
-      {/* Checkbox — always visible when showCheckbox, otherwise on hover */}
+      {/* Checkbox — visible on hover or during multi-select */}
       <div
         className={`flex-shrink-0 mr-2 transition-opacity ${showCheckbox || checked ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         onClick={onCheck}
@@ -287,9 +294,9 @@ function MailItem({
         />
       </div>
 
-      {/* Avatar — hidden when checkbox visible to save space */}
+      {/* Avatar — hide when in multi-select mode to keep layout compact */}
       {!showCheckbox && (
-        <div className={`avatar ${color} text-xs mr-3 flex-shrink-0 transition-opacity ${checked ? "opacity-0 w-0 mr-0 overflow-hidden" : ""}`}>
+        <div className={`avatar ${color} text-xs mr-3 flex-shrink-0`}>
           {initial}
         </div>
       )}
