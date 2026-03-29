@@ -2,7 +2,6 @@ import { Router } from "express";
 import axios from "axios";
 import { requireAuth } from "../middleware/auth.js";
 import { listFiles, uploadFile, provisionUser } from "../services/nextcloudService.js";
-import { listLocalFiles, localStorageLocation, uploadLocalFile } from "../services/localFileService.js";
 import { config } from "../config/index.js";
 
 const router = Router();
@@ -45,36 +44,23 @@ router.get("/nc-redirect", (req, res) => {
 // ── Authenticated routes ───────────────────────────────────────────────────────
 router.use(requireAuth);
 
-// GET /files/storage-info
-router.get("/storage-info", (req, res) => {
-  const driver = config.FILE_STORAGE_DRIVER;
-  if (driver === "local") {
-    const hostBase = config.LOCAL_FILES_HOST_PATH;
-    const location = hostBase
-      ? `${hostBase.replace(/[\\/]+$/, "")}/${req.user!.sub}`
-      : localStorageLocation(req.user!.sub);
-    res.json({ driver, location });
+router.use((_req, res, next) => {
+  if (!process.env.NEXTCLOUD_URL) {
+    res.status(503).json({ error: "Nextcloud not configured in this deployment." });
     return;
   }
-  res.json({ driver, location: `/remote.php/dav/files/${encodeURIComponent(req.user!.sub)}/` });
+  next();
 });
 
 // GET /files?path=/
 router.get("/", async (req, res, next) => {
   try {
     const email    = req.user!.sub;
+    const password = req.userPassword!;
     const path     = (req.query.path as string) || "/";
-    let files;
-
-    if (config.FILE_STORAGE_DRIVER === "local") {
-      files = await listLocalFiles(email, path);
-    } else {
-      const password = req.userPassword!;
-      // Ensure NC user exists and password is synced before every WebDAV call
-      await provisionUser(email, password).catch(() => {});
-      files = await listFiles(email, password, path);
-    }
-
+    // Ensure NC user exists and password is synced before every WebDAV call
+    await provisionUser(email, password).catch(() => {});
+    const files = await listFiles(email, password, path);
     res.json(files);
   } catch (e) { next(e); }
 });
@@ -89,70 +75,10 @@ router.post("/upload", async (req, res, next) => {
     req.on("end", async () => {
       try {
         const content = Buffer.concat(chunks);
-        if (config.FILE_STORAGE_DRIVER === "local") {
-          await uploadLocalFile(req.user!.sub, path, content);
-        } else {
-          await uploadFile(req.user!.sub, req.userPassword!, path, content, contentType);
-        }
+        await uploadFile(req.user!.sub, req.userPassword!, path, content, contentType);
         res.json({ ok: true });
       } catch (e) { next(e); }
     });
-  } catch (e) { next(e); }
-});
-
-// POST /files/create-folder — create a new directory
-router.post("/create-folder", async (req, res, next) => {
-  try {
-    const dirPath = (req.body?.path as string) || "/";
-    const email = req.user!.sub;
-    if (config.FILE_STORAGE_DRIVER === "local") {
-      await uploadLocalFile(email, dirPath + "/.keep", Buffer.alloc(0));
-    } else {
-      await uploadFile(email, req.userPassword!, dirPath + "/.keep", Buffer.alloc(0), "application/octet-stream");
-    }
-    res.json({ ok: true });
-  } catch (e) { next(e); }
-});
-
-// POST /files/create — create a new file with template content
-router.post("/create", async (req, res, next) => {
-  try {
-    const filePath = (req.body?.path as string) || "/untitled.txt";
-    const email = req.user!.sub;
-
-    // Generate template content based on extension
-    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
-    let content: Buffer;
-    let contentType = "application/octet-stream";
-
-    switch (ext) {
-      case "txt":
-        content = Buffer.from("");
-        contentType = "text/plain";
-        break;
-      case "md":
-        content = Buffer.from("# Untitled\n\n");
-        contentType = "text/markdown";
-        break;
-      case "csv":
-        content = Buffer.from("Column A,Column B,Column C\n");
-        contentType = "text/csv";
-        break;
-      case "html":
-        content = Buffer.from("<!DOCTYPE html>\n<html>\n<head><title>Untitled</title></head>\n<body>\n\n</body>\n</html>\n");
-        contentType = "text/html";
-        break;
-      default:
-        content = Buffer.from("");
-        break;
-    }
-
-    if (config.FILE_STORAGE_DRIVER === "local") {
-      await uploadLocalFile(email, filePath, content);
-    } else {
-      await uploadFile(email, req.userPassword!, filePath, content, contentType);
-    }
-    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

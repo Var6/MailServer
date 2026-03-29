@@ -10,6 +10,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
-RUN mkdir -p /home/node/local-files && chown -R node:node /home/node/local-files
+USER node
 EXPOSE 3000
 CMD ["node", "dist/index.js"]
