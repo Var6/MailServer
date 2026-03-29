@@ -145,7 +145,7 @@ export default function ComposeModal() {
     ],
     editorProps: {
       attributes: {
-        class: "outline-none min-h-[180px] text-sm text-[#202124] leading-relaxed prose prose-sm max-w-none",
+        class: "outline-none min-h-[180px] text-sm leading-relaxed prose prose-sm max-w-none",
       },
     },
     autofocus: !!replyTo,
@@ -485,7 +485,8 @@ export default function ComposeModal() {
       )}
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-3 flex-shrink-0 bg-gray-50">
+      <div className="px-4 py-3 border-t flex items-center gap-3 flex-shrink-0"
+        style={{ borderColor: t.borderLight, backgroundColor: t.toolbar }}>
         <button
           onClick={() => mutation.mutate()}
           disabled={!to.trim() || isBodyEmpty || mutation.isPending}
@@ -503,7 +504,8 @@ export default function ComposeModal() {
           onChange={e => handleFiles(e.target.files)}
         />
         <button
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full transition-colors"
+          style={{ color: t.muted }}
           title="Attach file"
           onClick={() => fileInputRef.current?.click()}
         >
@@ -512,10 +514,10 @@ export default function ComposeModal() {
         </button>
 
         <div className="flex-1" />
-        <span className="text-[11px] text-[#5f6368] hidden sm:inline text-right max-w-[260px] leading-4">
+        <span className="text-[11px] hidden sm:inline text-right max-w-[260px] leading-4" style={{ color: t.muted }}>
           Sent mails and attachments are saved in your mailbox Sent folder (IMAP).
         </span>
-        <button onClick={handleClose} className="btn-ghost text-gray-400 p-1.5" title="Discard">
+        <button onClick={handleClose} className="btn-ghost p-1.5" style={{ color: t.muted }} title="Discard">
           <X size={16} />
         </button>
       </div>
@@ -523,23 +525,25 @@ export default function ComposeModal() {
   );
 }
 
-function FieldRow({ label, children }: { label?: string; children: React.ReactNode }) {
+function FieldRow({ label, children, borderColor, mutedColor }: { label?: string; children: React.ReactNode; borderColor?: string; mutedColor?: string }) {
   return (
-    <div className="flex items-center gap-0 px-4 border-b border-gray-100 last:border-b-0">
-      {label && <span className="text-xs text-[#5f6368] w-6 flex-shrink-0">{label}</span>}
+    <div className="flex items-center gap-0 px-4 border-b last:border-b-0" style={{ borderColor: borderColor ?? "#f3f4f6" }}>
+      {label && <span className="text-xs w-6 flex-shrink-0" style={{ color: mutedColor ?? "#5f6368" }}>{label}</span>}
       {children}
     </div>
   );
 }
 
-function ToolbarBtn({ title, active, onClick, children }: {
-  title: string; active: boolean; onClick: () => void; children: React.ReactNode;
+function ToolbarBtn({ title, active, onClick, children, isDark }: {
+  title: string; active: boolean; onClick: () => void; children: React.ReactNode; isDark?: boolean;
 }) {
   return (
     <button
       type="button" title={title} onClick={onClick}
       className={`p-1.5 rounded transition-colors ${
-        active ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+        active
+          ? (isDark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700")
+          : (isDark ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700")
       }`}
     >
       {children}
