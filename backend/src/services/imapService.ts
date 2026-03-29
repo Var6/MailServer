@@ -333,7 +333,7 @@ export async function exportMailbox(email: string, password: string): Promise<Ma
           for await (const msg of client.fetch("1:*", { uid: true, flags: true, internalDate: true, source: true })) {
             folderMessages.push({
               flags: Array.from(msg.flags ?? []),
-              date: (msg.internalDate ?? new Date()).toISOString(),
+              date: new Date(msg.internalDate ?? new Date()).toISOString(),
               raw: (msg.source ?? Buffer.alloc(0)).toString("base64"),
             });
           }
