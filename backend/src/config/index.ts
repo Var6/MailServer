@@ -36,6 +36,9 @@ const envSchema = z.object({
 
   // Domain
   MAIL_DOMAIN:           z.string().default("yourdomain.com"),
+
+  // Inbound webhook shared secret (Cloudflare Worker → API)
+  INBOUND_WEBHOOK_SECRET: z.string().default(""),
 });
 
 export type Config = z.infer<typeof envSchema>;

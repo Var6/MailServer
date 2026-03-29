@@ -26,6 +26,8 @@ async function createFreshClient(email: string, password: string): Promise<ImapF
     logger: false,
     tls: { rejectUnauthorized: false },
   });
+  // Swallow socket-level errors on idle connections so they don't crash the process
+  client.on("error", () => { pool.delete(email); });
   await client.connect();
   pool.set(email, { client, lastUsed: Date.now() });
   return client;

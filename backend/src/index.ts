@@ -1,3 +1,11 @@
+// Prevent IMAP socket timeout errors from crashing the process
+process.on("uncaughtException", (err) => {
+  console.error("[uncaught]", err.message);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandled rejection]", reason);
+});
+
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";

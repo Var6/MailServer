@@ -65,4 +65,43 @@ router.post("/brevo", async (req, res) => {
   }
 });
 
+// POST /inbound/cloudflare
+// Cloudflare Email Worker sends the raw RFC 5322 email as base64.
+// We re-inject it directly into Postfix port 10025 preserving all headers.
+//
+// Worker request body (JSON):
+//   { raw: "<base64 RFC 5322 bytes>", from: "sender@gmail.com", to: "user@yourdomain.com" }
+// Worker request headers:
+//   x-webhook-secret: <matches INBOUND_WEBHOOK_SECRET in .env>
+router.post("/cloudflare", async (req, res) => {
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  const secret = req.headers["x-webhook-secret"];
+  if (config.INBOUND_WEBHOOK_SECRET && secret !== config.INBOUND_WEBHOOK_SECRET) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { raw, from, to } = req.body ?? {};
+  if (!raw || !from || !to) {
+    res.status(400).json({ error: "Missing raw, from, or to" });
+    return;
+  }
+
+  // ── Decode & inject via Postfix internal port 10025 ───────────────────────
+  try {
+    const rawBuffer = Buffer.from(raw as string, "base64");
+
+    await transport.sendMail({
+      envelope: { from: from as string, to: to as string },
+      raw: rawBuffer,
+    });
+
+    console.log(`[inbound/cloudflare] Delivered: ${from} → ${to}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[inbound/cloudflare] Delivery error:", err);
+    res.status(500).json({ error: "Delivery failed" });
+  }
+});
+
 export default router;
