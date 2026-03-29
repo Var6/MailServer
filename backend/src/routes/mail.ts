@@ -179,4 +179,50 @@ router.post("/messages/:uid/flag", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// GET /mail/backup  — export all emails as a JSON backup file
+router.get("/backup", async (req, res, next) => {
+  try {
+    const email    = req.user!.sub;
+    const password = req.userPassword!;
+    const backup   = await imap.exportMailbox(email, password);
+    const filename = `mailbackup_${email.replace("@", "_at_")}_${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.json(backup);
+  } catch (e) { next(e); }
+});
+
+// POST /mail/restore  — import a JSON backup (re-appends all messages via IMAP)
+router.post("/restore", async (req, res, next) => {
+  try {
+    const email    = req.user!.sub;
+    const password = req.userPassword!;
+    const backup   = req.body as imap.MailboxBackup;
+
+    if (!backup || backup.version !== 1 || !Array.isArray(backup.folders)) {
+      res.status(400).json({ error: "Invalid backup file format" });
+      return;
+    }
+
+    // Stream progress via SSE
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+    const total = backup.folders.reduce((s, f) => s + f.messages.length, 0);
+    send({ type: "start", total });
+
+    const { imported, skipped } = await imap.importMailbox(
+      email, password, backup,
+      (done, total) => send({ type: "progress", done, total })
+    );
+
+    send({ type: "done", imported, skipped });
+    res.end();
+  } catch (e) { next(e); }
+});
+
 export default router;

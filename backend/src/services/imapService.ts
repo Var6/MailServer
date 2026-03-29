@@ -296,6 +296,106 @@ export async function toggleFlag(
   });
 }
 
+// ── Backup / Restore ─────────────────────────────────────
+
+export interface BackupMessage {
+  flags: string[];
+  date: string;       // ISO
+  raw: string;        // base64 RFC 5322
+}
+
+export interface BackupFolder {
+  folder: string;
+  messages: BackupMessage[];
+}
+
+export interface MailboxBackup {
+  version: 1;
+  email: string;
+  exportedAt: string;
+  folders: BackupFolder[];
+}
+
+export async function exportMailbox(email: string, password: string): Promise<MailboxBackup> {
+  const folders = await listFolders(email, password);
+  const result: BackupFolder[] = [];
+
+  for (const f of folders) {
+    const folderMessages: BackupMessage[] = [];
+    try {
+      await withClient(email, password, async (client) => {
+        const lock = await client.getMailboxLock(f.path);
+        try {
+          const status = await client.status(f.path, { messages: true });
+          const total = status.messages ?? 0;
+          if (total === 0) return;
+
+          for await (const msg of client.fetch("1:*", { uid: true, flags: true, internalDate: true, source: true })) {
+            folderMessages.push({
+              flags: Array.from(msg.flags ?? []),
+              date: (msg.internalDate ?? new Date()).toISOString(),
+              raw: (msg.source ?? Buffer.alloc(0)).toString("base64"),
+            });
+          }
+        } finally {
+          lock.release();
+        }
+      });
+    } catch {
+      // Skip unreadable folders (e.g. \Noselect)
+    }
+    if (folderMessages.length > 0) {
+      result.push({ folder: f.path, messages: folderMessages });
+    }
+  }
+
+  return { version: 1, email, exportedAt: new Date().toISOString(), folders: result };
+}
+
+export async function importMailbox(
+  email: string,
+  password: string,
+  backup: MailboxBackup,
+  onProgress: (done: number, total: number) => void
+): Promise<{ imported: number; skipped: number }> {
+  let imported = 0;
+  let skipped = 0;
+  const totalMessages = backup.folders.reduce((s, f) => s + f.messages.length, 0);
+  let done = 0;
+
+  for (const folderData of backup.folders) {
+    try {
+      await withClient(email, password, async (client) => {
+        // Create folder if it doesn't exist
+        try { await client.mailboxCreate(folderData.folder); } catch { /* already exists */ }
+
+        const lock = await client.getMailboxLock(folderData.folder);
+        try {
+          for (const msg of folderData.messages) {
+            try {
+              const raw = Buffer.from(msg.raw, "base64");
+              await client.append(folderData.folder, raw, msg.flags, new Date(msg.date));
+              imported++;
+            } catch {
+              skipped++;
+            }
+            done++;
+            onProgress(done, totalMessages);
+          }
+        } finally {
+          lock.release();
+        }
+      });
+    } catch {
+      skipped += folderData.messages.length;
+      done += folderData.messages.length;
+      onProgress(done, totalMessages);
+    }
+  }
+
+  return { imported, skipped };
+}
+
 export async function appendToSent(
   email: string,
   password: string,
