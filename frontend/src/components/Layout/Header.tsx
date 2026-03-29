@@ -52,7 +52,7 @@ export default function Header() {
                 ? isDark ? "#374151" : "#ffffff"
                 : isDark ? "#374151" : "#f3f4f6",
               boxShadow: focused ? "0 1px 6px rgba(0,0,0,.15)" : "none",
-              ring: focused ? "1px" : "0",
+
               outline: focused ? `1px solid ${isDark ? "#60a5fa" : "#bfdbfe"}` : "none",
             }}
           >
