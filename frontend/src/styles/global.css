@@ -70,7 +70,7 @@
   pointer-events: none;
   height: 0;
 }
-.ProseMirror { outline: none; }
+.ProseMirror { outline: none; color: inherit; }
 .ProseMirror h1 { @apply text-xl font-bold mb-2; }
 .ProseMirror h2 { @apply text-lg font-semibold mb-2; }
 .ProseMirror h3 { @apply text-base font-semibold mb-1; }
@@ -82,9 +82,15 @@
 .ProseMirror a { @apply text-blue-600 underline; }
 .ProseMirror strong { @apply font-semibold; }
 
-/* Email body is rendered inside a white #fff wrapper — tables and images still need capping */
-.email-body-render table { max-width: 100% !important; }
-.email-body-render img { max-width: 100% !important; height: auto !important; }
+/* Email body — force all text colours to inherit theme, strip email backgrounds */
+.email-body * { color: inherit !important; }
+.email-body table, .email-body td, .email-body th, .email-body tr,
+.email-body div, .email-body span, .email-body p, .email-body section {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+.email-body table { max-width: 100% !important; }
+.email-body img { max-width: 100% !important; height: auto !important; }
 
 @layer utilities {
   .scrollbar-thin::-webkit-scrollbar { width: 6px; }

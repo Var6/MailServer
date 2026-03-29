@@ -14,9 +14,7 @@ networks:
   mailnet:
 
 volumes:
-  cert_data:
-  nextcloud_data:
-  nextcloud_html:
+  nextcloud_html:   # Nextcloud PHP code — MUST be on Linux FS (rsync incompatible with NTFS)
 
 services:
 
@@ -94,7 +92,7 @@ services:
       REDIS_HOST_PASSWORD: ${REDIS_PASSWORD}
       SERVER_URL: ${SERVER_URL}
     volumes:
-      - nextcloud_data:/var/www/html/data
+      - D:/maildata/files:/var/www/html/data
       - nextcloud_html:/var/www/html
       - ./config/nextcloud/nextcloud.config.php:/var/www/html/config/custom.config.php:ro
     depends_on:
@@ -133,7 +131,7 @@ services:
     volumes:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - cert_data:/etc/ssl/mailserver:ro
+      - D:/maildata/certs:/etc/ssl/mailserver:ro
       - nextcloud_html:/var/www/nextcloud:ro
     depends_on:
       - api
@@ -182,7 +180,7 @@ services:
     image: certbot/certbot:latest
     container_name: mailserver-certbot
     volumes:
-      - cert_data:/etc/letsencrypt
+      - D:/maildata/certs:/etc/letsencrypt
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     networks:
       - mailnet

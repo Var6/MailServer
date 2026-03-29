@@ -335,14 +335,10 @@ export default function MessageView() {
           <div className="text-sm leading-relaxed" style={{ color: textColor }}>
             {msg.html ? (
               <div
-                className="rounded-lg overflow-hidden"
-                style={{ backgroundColor: "#ffffff", color: "#202124" }}
-              >
-                <div
-                  className="p-4 prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline"
-                  dangerouslySetInnerHTML={{ __html: sanitize(msg.html) }}
-                />
-              </div>
+                className="p-4 prose prose-sm max-w-none [&_a]:text-blue-400 email-body"
+                style={{ color: isDark ? "#f9fafb" : "#111827" }}
+                dangerouslySetInnerHTML={{ __html: sanitize(msg.html) }}
+              />
             ) : (
               <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{msg.text}</pre>
             )}
@@ -411,9 +407,10 @@ export default function MessageView() {
 }
 
 function sanitize(html: string): string {
-  // Basic script removal — install DOMPurify for production
   return html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")  // strip email-embedded CSS so our theme wins
     .replace(/on\w+="[^"]*"/gi, "")
-    .replace(/on\w+='[^']*'/gi, "");
+    .replace(/on\w+='[^']*'/gi, "")
+    .replace(/(\s)(bgcolor|background)\s*=\s*["'][^"']*["']/gi, "");  // strip bgcolor attrs
 }

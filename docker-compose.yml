@@ -2,11 +2,8 @@ version: "3.9"
 
 # ============================================================
 #  MailServer — Core Mail Stack
-#  docker-compose.yml  (Windows / single-server edition)
-#
-#  HA components removed: GlusterFS, Keepalived, MongoDB
-#  replica-set flags, keyfile auth, and HAProxy are all gone.
-#  Data lives in named Docker volumes — no host-path coupling.
+#  All persistent data stored under D:\maildata\
+#  so it's visible, portable, and easy to back up.
 # ============================================================
 
 networks:
@@ -14,12 +11,8 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb_data:
-  redis_data:
-  mail_data:
-  cert_data:
-  dkim_keys:
-  clamav_db:
+  clamav_db:      # ClamAV virus DB — no need to back up, re-downloads automatically
+  mongodb_data:   # MongoDB MUST be on Linux FS (WiredTiger incompatible with NTFS bind-mounts)
 
 services:
 
@@ -55,7 +48,7 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
-      - redis_data:/data
+      - D:/maildata/redis:/data
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - mailnet
@@ -76,9 +69,9 @@ services:
     env_file: .env
     hostname: ${MAIL_HOSTNAME}
     volumes:
-      - mail_data:/var/mail/vhosts
-      - cert_data:/etc/ssl/mailserver:ro
-      - dkim_keys:/etc/opendkim/keys
+      - D:/maildata/mail:/var/mail/vhosts
+      - D:/maildata/certs:/etc/ssl/mailserver:ro
+      - D:/maildata/dkim:/etc/opendkim/keys
       - ./config/postfix/main.cf:/etc/postfix/main.cf
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
       - ./config/postfix/virtual_mailbox_pcre:/etc/postfix/virtual_mailbox_pcre:ro
@@ -107,8 +100,8 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - mail_data:/var/mail/vhosts
-      - cert_data:/etc/ssl/mailserver:ro
+      - D:/maildata/mail:/var/mail/vhosts
+      - D:/maildata/certs:/etc/ssl/mailserver:ro
       - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
       - ./config/dovecot/conf.d:/etc/dovecot/conf.d:ro
     ports:
@@ -131,7 +124,7 @@ services:
     volumes:
       - ./config/rspamd/local.d:/etc/rspamd/local.d:ro
       - ./config/rspamd/override.d:/etc/rspamd/override.d:ro
-      - dkim_keys:/var/lib/rspamd/dkim:ro
+      - D:/maildata/dkim:/var/lib/rspamd/dkim:ro
     depends_on:
       redis:
         condition: service_healthy
