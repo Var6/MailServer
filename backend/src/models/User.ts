@@ -10,6 +10,7 @@ export interface IUser extends Document {
   quotaMb: number;
   active: boolean;
   displayName?: string;
+  avatar?: string;
   createdAt: Date;
 }
 
@@ -21,6 +22,7 @@ const UserSchema = new Schema<IUser>({
   quotaMb:     { type: Number, default: 1024 },
   active:      { type: Boolean, default: true },
   displayName: { type: String },
+  avatar:      { type: String },
   createdAt:   { type: Date, default: Date.now },
 });
 

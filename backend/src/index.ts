@@ -24,6 +24,7 @@ import tenantRouter   from "./routes/tenants.js";
 import adminRouter    from "./routes/adminPanel.js";
 import billingRouter  from "./routes/billing.js";
 import setupRouter        from "./routes/setup.js";
+import settingsRouter     from "./routes/settings.js";
 import inboundWebhookRouter from "./routes/inboundWebhook.js";
 import { startPostfixTcpMap } from "./services/postfixTcpMap.js";
 
@@ -64,6 +65,7 @@ app.use("/tenants",   tenantRouter);     // Superadmin: manage companies
 app.use("/admin",     adminRouter);      // Admin: manage own company users
 app.use("/billing",   billingRouter);   // Superadmin: billing management
 app.use("/setup",     setupRouter);     // First-run: create superadmin (no-op after)
+app.use("/settings",  settingsRouter);  // User profile & password
 
 // ── Error handler ─────────────────────────────────────────
 app.use(errorHandler);

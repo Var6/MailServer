@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Folder, FileText, Upload, ExternalLink, ChevronRight,
   Image, FileSpreadsheet, Presentation, FileCode, Film, Music, Pencil,
+  Plus, FolderPlus, FileType, Table, FileType2,
 } from "lucide-react";
 import { apiClient } from "../api/client.ts";
 import { formatBytes } from "../lib/utils.ts";
-import { useToastStore } from "../store/index.ts";
+import { useToastStore, useUiThemeStore } from "../store/index.ts";
 
 function fileExt(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
@@ -52,15 +53,88 @@ async function openInCollabora(filePath: string) {
   openNextcloud(redirect);
 }
 
+const DARK_TEXT_COLORS = ["#f3f4f6", "#f1f5f9", "#f3e8ff", "#e9d5ff", "#f0f9ff", "#f9fafb", "#fce7f3"];
+const BG_THEMES = [
+  { bg: "#eef2ff", text: "#1f2937" }, { bg: "#f5f7fb", text: "#1f2937" },
+  { bg: "#e9f5ff", text: "#1f2937" }, { bg: "#f4efe6", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", text: "#1f2937" },
+  { bg: "#1f2937", text: "#f3f4f6" }, { bg: "#0f172a", text: "#f1f5f9" },
+  { bg: "#1e1b4b", text: "#f3e8ff" }, { bg: "#0c0a1e", text: "#e9d5ff" },
+  { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", text: "#f0f9ff" },
+  { bg: "linear-gradient(120deg,#1f2937,#111827)", text: "#f9fafb" },
+  { bg: "linear-gradient(120deg,#1e293b,#0f172a)", text: "#f1f5f9" },
+  { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", text: "#fce7f3" },
+];
+
+function useTheme() {
+  const appBg = useUiThemeStore((s) => s.appBg);
+  const found = BG_THEMES.find(t => t.bg === appBg);
+  const textColor = found?.text || "#1f2937";
+  const isDark = DARK_TEXT_COLORS.includes(textColor);
+  return { appBg, textColor, isDark };
+}
+
+const NEW_FILE_OPTIONS = [
+  { ext: "folder", label: "New Folder", icon: FolderPlus },
+  { ext: "txt", label: "Text Document", icon: FileText },
+  { ext: "md", label: "Markdown", icon: FileType },
+  { ext: "csv", label: "Spreadsheet (CSV)", icon: Table },
+  { ext: "html", label: "HTML Page", icon: FileCode },
+] as const;
+
 export default function FilesPage() {
   const [path, setPath]           = useState("/");
   const [breadcrumbs, setBreadcrumbs] = useState<string[]>([]);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [newFileType, setNewFileType] = useState<string | null>(null);
+  const newMenuRef = useRef<HTMLDivElement>(null);
   const [uploadQueue, setUploadQueue] = useState<Array<{
     name: string;
     progress: number;
     status: "uploading" | "done" | "error";
   }>>([]);
   const { addToast }              = useToastStore();
+  const { appBg, textColor, isDark } = useTheme();
+  const border = isDark ? "#374151" : "#e5e7eb";
+  const mutedColor = isDark ? "#9ca3af" : "#6b7280";
+  const cardBg = isDark ? "#1f2937" : "#ffffff";
+
+  // Close new-file menu on outside click
+  useEffect(() => {
+    if (!newMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) {
+        setNewMenuOpen(false);
+        setNewFileType(null);
+        setNewFileName("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [newMenuOpen]);
+
+  const handleCreateFile = async (ext: string, name: string) => {
+    try {
+      if (ext === "folder") {
+        await apiClient.post("/files/create-folder", { path: path + name + "/" });
+        addToast(`Folder "${name}" created`, "success");
+      } else {
+        const filePath = path + name + "." + ext;
+        await apiClient.post("/files/create", { path: filePath });
+        addToast(`File "${name}.${ext}" created`, "success");
+      }
+      setNewMenuOpen(false);
+      setNewFileType(null);
+      setNewFileName("");
+      refetch();
+    } catch {
+      addToast("Failed to create file", "error");
+    }
+  };
 
   const { data: storageInfo } = useQuery({
     queryKey: ["files-storage-info"],
@@ -128,11 +202,11 @@ export default function FilesPage() {
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({ onDrop, noClick: true });
 
   return (
-    <div className="h-full bg-white flex flex-col" {...getRootProps()}>
+    <div className="h-full flex flex-col" style={{ background: appBg, color: textColor }} {...getRootProps()}>
       <input {...getInputProps()} />
 
       {/* Header */}
-      <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+      <div className="px-6 py-3 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: border }}>
         <div className="flex items-center gap-1 text-sm">
           <button
             onClick={() => navigateTo(-1)}
@@ -142,12 +216,11 @@ export default function FilesPage() {
           </button>
           {breadcrumbs.map((crumb, i) => (
             <span key={i} className="flex items-center gap-1">
-              <ChevronRight size={14} className="text-gray-400" />
+              <ChevronRight size={14} style={{ color: mutedColor }} />
               <button
                 onClick={() => navigateTo(i)}
-                className={i === breadcrumbs.length - 1
-                  ? "text-[#202124] font-medium"
-                  : "text-blue-600 hover:underline"}
+                className={i === breadcrumbs.length - 1 ? "font-medium" : "text-blue-600 hover:underline"}
+                style={i === breadcrumbs.length - 1 ? { color: textColor } : undefined}
               >
                 {crumb}
               </button>
@@ -156,44 +229,113 @@ export default function FilesPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* New file dropdown */}
+          <div ref={newMenuRef} className="relative">
+            <button
+              onClick={() => setNewMenuOpen(v => !v)}
+              className="flex items-center gap-1.5 text-sm font-medium rounded-full px-3 py-1.5 transition-colors bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Plus size={14} /> New
+            </button>
+            {newMenuOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 w-56 rounded-xl border shadow-lg overflow-hidden z-50"
+                style={{ backgroundColor: cardBg, borderColor: border }}
+              >
+                {newFileType ? (
+                  <div className="p-3 space-y-2">
+                    <p className="text-xs font-medium" style={{ color: mutedColor }}>
+                      {newFileType === "folder" ? "Folder name" : "File name"}
+                    </p>
+                    <input
+                      autoFocus
+                      value={newFileName}
+                      onChange={e => setNewFileName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && newFileName.trim()) handleCreateFile(newFileType, newFileName.trim());
+                        if (e.key === "Escape") { setNewFileType(null); setNewFileName(""); }
+                      }}
+                      placeholder={newFileType === "folder" ? "My Folder" : "Untitled"}
+                      className="w-full rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+                      style={{ backgroundColor: isDark ? "#111827" : "#f9fafb", borderColor: border, color: textColor }}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => { setNewFileType(null); setNewFileName(""); }}
+                        className="text-xs px-2.5 py-1 rounded-lg transition"
+                        style={{ color: mutedColor }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => newFileName.trim() && handleCreateFile(newFileType, newFileName.trim())}
+                        disabled={!newFileName.trim()}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-blue-600 text-white disabled:opacity-50 transition"
+                      >
+                        Create
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  NEW_FILE_OPTIONS.map(opt => {
+                    const Icon = opt.icon;
+                    return (
+                      <button
+                        key={opt.ext}
+                        onClick={() => { setNewFileType(opt.ext); setNewFileName(""); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                        style={{ color: textColor }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = isDark ? "#374151" : "#f3f4f6")}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                      >
+                        <Icon size={16} style={{ color: mutedColor }} />
+                        {opt.label}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={open}
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700
-                       border border-blue-200 hover:border-blue-400 rounded-full px-3 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 text-sm rounded-full px-3 py-1.5 transition-colors border"
+            style={{ color: isDark ? "#93c5fd" : "#2563eb", borderColor: isDark ? "#374151" : "#bfdbfe" }}
           >
             <Upload size={14} /> Upload
           </button>
           <button
             onClick={() => openNextcloud("/index.php/apps/files/")}
-            className="flex items-center gap-1.5 text-sm text-[#5f6368] hover:text-[#202124]
-                       border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 text-sm rounded-full px-3 py-1.5 transition-colors border"
+            style={{ color: mutedColor, borderColor: border }}
           >
             Open LibreOffice <ExternalLink size={12} />
           </button>
         </div>
       </div>
 
-      <div className="px-6 py-2 border-b border-gray-100 bg-gray-50 text-xs text-[#5f6368]">
+      <div className="px-6 py-2 border-b text-xs" style={{ borderColor: border, backgroundColor: isDark ? "#111827" : "#f9fafb", color: mutedColor }}>
         {storageInfo?.driver === "local"
           ? (
-            <>Files are stored on this system at <span className="font-medium text-[#202124]">{storageInfo.location}{path}</span>. LibreOffice web editor is available via Nextcloud.</>
+            <>Files are stored on this system at <span className="font-medium" style={{ color: textColor }}>{storageInfo.location}{path}</span>. LibreOffice web editor is available via Nextcloud.</>
           )
           : (
-            <>Files are stored in Nextcloud at <span className="font-medium text-[#202124]">{storageInfo?.location ?? "/remote.php/dav/files/<your-email>/"}{path}</span></>
+            <>Files are stored in Nextcloud at <span className="font-medium" style={{ color: textColor }}>{storageInfo?.location ?? "/remote.php/dav/files/<your-email>/"}{path}</span></>
           )}
       </div>
 
       {uploadQueue.length > 0 && (
-        <div className="px-6 py-3 border-b border-gray-100 bg-blue-50/50 space-y-2">
+        <div className="px-6 py-3 border-b space-y-2" style={{ borderColor: border, backgroundColor: isDark ? "#111827" : "#eff6ff" }}>
           {uploadQueue.map((upload) => (
             <div key={upload.name}>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[#202124] truncate pr-2">{upload.name}</span>
-                <span className={upload.status === "error" ? "text-red-600" : "text-[#5f6368]"}>
+                <span className="truncate pr-2" style={{ color: textColor }}>{upload.name}</span>
+                <span className={upload.status === "error" ? "text-red-500" : ""} style={upload.status !== "error" ? { color: mutedColor } : undefined}>
                   {upload.status === "error" ? "Failed" : `${upload.progress}%`}
                 </span>
               </div>
-              <div className="w-full h-1.5 rounded-full bg-blue-100 overflow-hidden mt-1">
+              <div className="w-full h-1.5 rounded-full overflow-hidden mt-1" style={{ backgroundColor: isDark ? "#374151" : "#dbeafe" }}>
                 <div
                   className={`h-full transition-all ${upload.status === "error" ? "bg-red-500" : "bg-blue-600"}`}
                   style={{ width: `${upload.progress}%` }}
@@ -222,21 +364,21 @@ export default function FilesPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {[...Array(12)].map((_, i) => (
               <div key={i} className="flex flex-col items-center p-4 gap-2">
-                <div className="skeleton w-10 h-10 rounded-lg" />
-                <div className="skeleton h-2.5 w-16 rounded" />
+                <div className="rounded-lg" style={{ width: 40, height: 40, backgroundColor: isDark ? "#374151" : "#e5e7eb" }} />
+                <div className="rounded" style={{ width: 64, height: 10, backgroundColor: isDark ? "#374151" : "#e5e7eb" }} />
               </div>
             ))}
           </div>
         )}
 
         {!isLoading && (!data || data.length === 0) && (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center">
-              <Folder size={36} className="opacity-40" />
+          <div className="flex flex-col items-center justify-center h-64 gap-3">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: isDark ? "#374151" : "#f3f4f6" }}>
+              <Folder size={36} className="opacity-40" style={{ color: mutedColor }} />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-[#5f6368]">No files here</p>
-              <p className="text-xs mt-1">Drag and drop to upload, or click Upload</p>
+              <p className="text-sm font-medium" style={{ color: mutedColor }}>No files here</p>
+              <p className="text-xs mt-1" style={{ color: isDark ? "#6b7280" : "#9ca3af" }}>Drag and drop to upload, or click Upload</p>
             </div>
           </div>
         )}
@@ -246,9 +388,17 @@ export default function FilesPage() {
             {(data as any[]).map((file: any, i: number) => (
               <div
                 key={i}
-                className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 cursor-pointer
-                           group transition-colors border border-transparent hover:border-gray-200 relative"
+                className="flex flex-col items-center p-3 rounded-xl cursor-pointer group transition-colors border border-transparent"
+                style={{ color: textColor }}
                 onClick={() => file.isDirectory && navigate(file.name)}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = isDark ? "#374151" : "#f3f4f6";
+                  e.currentTarget.style.borderColor = border;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }}
               >
                 <div className="mb-2 relative">
                   <FileIcon name={file.name} contentType={file.contentType} isDir={file.isDirectory} />
@@ -263,11 +413,11 @@ export default function FilesPage() {
                     </button>
                   )}
                 </div>
-                <span className="text-xs text-[#202124] text-center truncate w-full font-medium">
+                <span className="text-xs text-center truncate w-full font-medium" style={{ color: textColor }}>
                   {file.name}
                 </span>
                 {!file.isDirectory && file.size != null && (
-                  <span className="text-xs text-[#5f6368] mt-0.5">{formatBytes(file.size)}</span>
+                  <span className="text-xs mt-0.5" style={{ color: mutedColor }}>{formatBytes(file.size)}</span>
                 )}
               </div>
             ))}

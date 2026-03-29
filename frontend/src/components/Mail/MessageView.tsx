@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { getMessage, flagMessage, deleteMessage, moveMessage, permanentDeleteMessage, downloadAttachment, openAttachmentOnline } from "../../api/mailApi.ts";
 import { apiClient } from "../../api/client.ts";
-import { useMailStore, useToastStore, useAuthStore } from "../../store/index.ts";
+import { useMailStore, useToastStore, useAuthStore, useUiThemeStore } from "../../store/index.ts";
 import { formatFullDate, avatarColor, senderInitial, senderName } from "../../lib/utils.ts";
 import { MessageSkeleton } from "../ui/Skeleton.tsx";
 import { formatBytes } from "../../lib/utils.ts";
@@ -19,6 +19,28 @@ export default function MessageView() {
   const qc = useQueryClient();
   const [showDetails, setShowDetails] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const DARK_TEXT_COLORS = ["#f3f4f6", "#f1f5f9", "#f3e8ff", "#e9d5ff", "#f0f9ff", "#f9fafb", "#fce7f3"];
+  const BG_THEMES = [
+    { bg: "#eef2ff", text: "#1f2937" }, { bg: "#f5f7fb", text: "#1f2937" },
+    { bg: "#e9f5ff", text: "#1f2937" }, { bg: "#f4efe6", text: "#1f2937" },
+    { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", text: "#1f2937" },
+    { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", text: "#1f2937" },
+    { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", text: "#1f2937" },
+    { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", text: "#1f2937" },
+    { bg: "#1f2937", text: "#f3f4f6" }, { bg: "#0f172a", text: "#f1f5f9" },
+    { bg: "#1e1b4b", text: "#f3e8ff" }, { bg: "#0c0a1e", text: "#e9d5ff" },
+    { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", text: "#f0f9ff" },
+    { bg: "linear-gradient(120deg,#1f2937,#111827)", text: "#f9fafb" },
+    { bg: "linear-gradient(120deg,#1e293b,#0f172a)", text: "#f1f5f9" },
+    { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", text: "#fce7f3" },
+  ];
+  const appBg = useUiThemeStore((s) => s.appBg);
+  const foundTheme = BG_THEMES.find(t => t.bg === appBg);
+  const textColor = foundTheme?.text || "#1f2937";
+  const isDark = DARK_TEXT_COLORS.includes(textColor);
+  const mutedColor = isDark ? "#9ca3af" : "#5f6368";
+  const border = isDark ? "#374151" : "#e5e7eb";
 
   const OFFICE_TYPES = new Set(["doc", "docx", "odt", "xls", "xlsx", "ods", "ppt", "pptx", "odp"]);
   const isOfficeFile = (name: string) => OFFICE_TYPES.has(name.split(".").pop()?.toLowerCase() ?? "");
@@ -137,32 +159,32 @@ export default function MessageView() {
 
   if (!selectedUid) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
-        <div className="w-24 h-24 rounded-full bg-[#eaf1fb] flex items-center justify-center">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4" style={{ background: appBg, color: textColor }}>
+        <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ backgroundColor: isDark ? "#374151" : "#eaf1fb" }}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4285f4" strokeWidth="1.2">
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
             <polyline points="22,6 12,13 2,6"/>
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-base font-medium text-[#202124]">No message selected</p>
-          <p className="text-sm text-[#5f6368] mt-1">Select a message from the list to read it</p>
+          <p className="text-base font-medium" style={{ color: textColor }}>No message selected</p>
+          <p className="text-sm mt-1" style={{ color: mutedColor }}>Select a message from the list to read it</p>
         </div>
       </div>
     );
   }
 
-  if (isLoading) return <div className="flex-1 bg-white overflow-y-auto"><MessageSkeleton /></div>;
-  if (!msg)      return <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Message not found</div>;
+  if (isLoading) return <div className="flex-1 overflow-y-auto" style={{ background: appBg }}><MessageSkeleton /></div>;
+  if (!msg)      return <div className="flex-1 flex items-center justify-center text-sm" style={{ background: appBg, color: mutedColor }}>Message not found</div>;
 
   const senderColor = avatarColor(msg.from);
   const senderInit  = senderInitial(msg.from);
   const senderN     = senderName(msg.from);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: appBg, color: textColor }}>
       {/* Top toolbar */}
-      <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-1 flex-shrink-0">
+      <div className="px-4 py-2 border-b flex items-center gap-1 flex-shrink-0" style={{ borderColor: border }}>
         <button
           onClick={() => openCompose({ uid: msg.uid, from: msg.from, subject: msg.subject, type: "reply" })}
           className="btn-ghost flex items-center gap-1.5 text-sm"
@@ -252,14 +274,14 @@ export default function MessageView() {
           </button>
           {menuOpen && (
             <div
-              className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg
-                         shadow-lg z-20 py-1"
+              className="absolute right-0 top-full mt-1 w-44 border rounded-lg shadow-lg z-20 py-1"
+              style={{ backgroundColor: isDark ? "#1f2937" : "white", borderColor: border }}
               onMouseLeave={() => setMenuOpen(false)}
             >
-              <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+              <button className="w-full text-left px-3 py-2 text-sm flex items-center gap-2" style={{ color: textColor }}>
                 <Printer size={14} /> Print
               </button>
-              <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+              <button className="w-full text-left px-3 py-2 text-sm flex items-center gap-2" style={{ color: textColor }}>
                 <ExternalLink size={14} /> Open in new window
               </button>
             </div>
@@ -271,7 +293,7 @@ export default function MessageView() {
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         <div className="px-6 py-5 max-w-4xl">
           {/* Subject */}
-          <h1 className="text-2xl font-normal text-[#202124] mb-4 leading-snug">
+          <h1 className="text-2xl font-normal mb-4 leading-snug" style={{ color: textColor }}>
             {msg.subject || "(no subject)"}
           </h1>
 
@@ -281,35 +303,36 @@ export default function MessageView() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-medium text-[#202124] text-sm">{senderN}</span>
-                  <span className="text-[#5f6368] text-sm ml-1.5">&lt;{msg.from.match(/<(.+)>/)?.[1] ?? msg.from}&gt;</span>
+                  <span className="font-medium text-sm" style={{ color: textColor }}>{senderN}</span>
+                  <span className="text-sm ml-1.5" style={{ color: mutedColor }}>&lt;{msg.from.match(/<(.+)>/)?.[1] ?? msg.from}&gt;</span>
                 </div>
-                <span className="text-xs text-[#5f6368] flex-shrink-0 ml-4">
+                <span className="text-xs flex-shrink-0 ml-4" style={{ color: mutedColor }}>
                   {formatFullDate(msg.date)}
                 </span>
               </div>
 
               <button
                 onClick={() => setShowDetails(v => !v)}
-                className="flex items-center gap-0.5 text-xs text-[#5f6368] hover:text-[#202124] mt-0.5 transition-colors"
+                className="flex items-center gap-0.5 text-xs mt-0.5 transition-colors"
+                style={{ color: mutedColor }}
               >
                 {showDetails ? "to me" : `to ${msg.to}`}
                 <ChevronDown size={12} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
               </button>
 
               {showDetails && (
-                <div className="mt-2 text-xs text-[#5f6368] space-y-0.5 bg-gray-50 rounded-lg p-3">
-                  <div><span className="font-medium text-[#202124] w-12 inline-block">from:</span> {msg.from}</div>
-                  <div><span className="font-medium text-[#202124] w-12 inline-block">to:</span> {msg.to}</div>
-                  <div><span className="font-medium text-[#202124] w-12 inline-block">date:</span> {formatFullDate(msg.date)}</div>
-                  <div><span className="font-medium text-[#202124] w-12 inline-block">subject:</span> {msg.subject}</div>
+                <div className="mt-2 text-xs space-y-0.5 rounded-lg p-3" style={{ color: mutedColor, backgroundColor: isDark ? "#374151" : "#f9fafb" }}>
+                  <div><span className="font-medium w-12 inline-block" style={{ color: textColor }}>from:</span> {msg.from}</div>
+                  <div><span className="font-medium w-12 inline-block" style={{ color: textColor }}>to:</span> {msg.to}</div>
+                  <div><span className="font-medium w-12 inline-block" style={{ color: textColor }}>date:</span> {formatFullDate(msg.date)}</div>
+                  <div><span className="font-medium w-12 inline-block" style={{ color: textColor }}>subject:</span> {msg.subject}</div>
                 </div>
               )}
             </div>
           </div>
 
           {/* Body */}
-          <div className="text-sm text-[#202124] leading-relaxed">
+          <div className="text-sm leading-relaxed" style={{ color: textColor }}>
             {msg.html ? (
               <div
                 className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline email-body-render"
@@ -322,28 +345,29 @@ export default function MessageView() {
 
           {/* Attachments */}
           {msg.attachments.length > 0 && (
-            <div className="mt-8 pt-4 border-t border-gray-100">
-              <p className="text-xs font-medium text-[#5f6368] uppercase tracking-wider mb-3">
+            <div className="mt-8 pt-4 border-t" style={{ borderColor: border }}>
+              <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: mutedColor }}>
                 {msg.attachments.length} attachment{msg.attachments.length !== 1 ? "s" : ""}
               </p>
               <div className="flex flex-wrap gap-3">
                 {msg.attachments.map((att, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-2.5 border border-gray-200 hover:border-gray-300
-                               rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors group"
+                    className="flex items-center gap-2.5 border rounded-xl px-4 py-3 transition-colors group"
+                    style={{ borderColor: border, backgroundColor: isDark ? "#1f2937" : "white" }}
                   >
                     <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Paperclip size={15} className="text-blue-600" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-[#202124] max-w-[160px] truncate">{att.filename}</p>
-                      <p className="text-xs text-[#5f6368]">{formatBytes(att.size)}</p>
+                      <p className="text-xs font-medium max-w-[160px] truncate" style={{ color: textColor }}>{att.filename}</p>
+                      <p className="text-xs" style={{ color: mutedColor }}>{formatBytes(att.size)}</p>
                     </div>
                     <div className="flex items-center gap-1 ml-auto">
                       <button
                         onClick={() => downloadAttachmentMutation.mutate({ index: i, filename: att.filename })}
-                        className="text-xs px-2 py-1 rounded-md border border-gray-200 hover:bg-white text-[#202124]"
+                        className="text-xs px-2 py-1 rounded-md border"
+                        style={{ borderColor: border, color: textColor }}
                         disabled={downloadAttachmentMutation.isPending}
                       >
                         Download
@@ -368,8 +392,8 @@ export default function MessageView() {
           <div className="mt-8">
             <button
               onClick={() => openCompose({ uid: msg.uid, from: msg.from, subject: msg.subject, type: "reply" })}
-              className="flex items-center gap-2 border border-gray-300 hover:border-gray-400 rounded-full
-                         px-5 py-2.5 text-sm text-[#202124] transition-colors hover:shadow-sm"
+              className="flex items-center gap-2 border rounded-full px-5 py-2.5 text-sm transition-colors hover:shadow-sm"
+              style={{ borderColor: border, color: textColor }}
             >
               <CornerUpLeft size={15} />
               Reply

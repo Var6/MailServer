@@ -100,6 +100,62 @@ router.post("/upload", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// POST /files/create-folder — create a new directory
+router.post("/create-folder", async (req, res, next) => {
+  try {
+    const dirPath = (req.body?.path as string) || "/";
+    const email = req.user!.sub;
+    if (config.FILE_STORAGE_DRIVER === "local") {
+      await uploadLocalFile(email, dirPath + "/.keep", Buffer.alloc(0));
+    } else {
+      await uploadFile(email, req.userPassword!, dirPath + "/.keep", Buffer.alloc(0), "application/octet-stream");
+    }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// POST /files/create — create a new file with template content
+router.post("/create", async (req, res, next) => {
+  try {
+    const filePath = (req.body?.path as string) || "/untitled.txt";
+    const email = req.user!.sub;
+
+    // Generate template content based on extension
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+    let content: Buffer;
+    let contentType = "application/octet-stream";
+
+    switch (ext) {
+      case "txt":
+        content = Buffer.from("");
+        contentType = "text/plain";
+        break;
+      case "md":
+        content = Buffer.from("# Untitled\n\n");
+        contentType = "text/markdown";
+        break;
+      case "csv":
+        content = Buffer.from("Column A,Column B,Column C\n");
+        contentType = "text/csv";
+        break;
+      case "html":
+        content = Buffer.from("<!DOCTYPE html>\n<html>\n<head><title>Untitled</title></head>\n<body>\n\n</body>\n</html>\n");
+        contentType = "text/html";
+        break;
+      default:
+        content = Buffer.from("");
+        break;
+    }
+
+    if (config.FILE_STORAGE_DRIVER === "local") {
+      await uploadLocalFile(email, filePath, content);
+    } else {
+      await uploadFile(email, req.userPassword!, filePath, content, contentType);
+    }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // POST /files/nc-login  (requires auth — called via axios with JWT)
 // Provisions NC user if needed, does server-side NC login, returns a one-time redirect token
 router.post("/nc-login", async (req, res, next) => {

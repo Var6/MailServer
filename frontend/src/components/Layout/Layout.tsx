@@ -10,7 +10,7 @@ export default function Layout() {
   const appBg = useUiThemeStore(s => s.appBg);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: appBg }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: appBg }}>
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         <Header />

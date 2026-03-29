@@ -11,6 +11,7 @@ import FilesPage           from "./pages/Files.tsx";
 import TenantsPage         from "./pages/superadmin/Tenants.tsx";
 import BillingPage         from "./pages/superadmin/Billing.tsx";
 import AdminUsersPage      from "./pages/admin/Users.tsx";
+import SettingsPage         from "./pages/Settings.tsx";
 import Layout              from "./components/Layout/Layout.tsx";
 import { getDefaultMailRoute } from "./lib/mailFolders.ts";
 
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="contacts" element={<ContactsPage />} />
           <Route path="files"    element={<FilesPage />} />
+          <Route path="settings" element={<SettingsPage />} />
 
           {/* Admin routes */}
           <Route

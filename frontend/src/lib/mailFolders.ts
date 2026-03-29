@@ -19,14 +19,14 @@ const FOLDER_ALIASES: Record<string, string> = {
 };
 
 export function folderToSlug(folder: string): string {
-  const canonical = FOLDER_ALIASES[normalize(folder)] ?? folder;
-  return canonical.toLowerCase().replace(/[\s/]+/g, "-");
+  return encodeURIComponent(folder);
 }
 
 export function slugToFolder(slug?: string): string {
   if (!slug) return DEFAULT_FOLDER;
-  const key = normalize(decodeURIComponent(slug));
-  return FOLDER_ALIASES[key] ?? decodeURIComponent(slug);
+  const decoded = decodeURIComponent(slug);
+  const key = normalize(decoded);
+  return FOLDER_ALIASES[key] ?? decoded;
 }
 
 export function getDefaultMailRoute(): string {

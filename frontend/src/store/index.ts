@@ -10,7 +10,9 @@ interface AuthState {
   role: UserRole | null;
   domain: string | null;
   displayName: string | null;
-  setAuth: (token: string, user: { email: string; role: UserRole; domain: string; displayName?: string }) => void;
+  avatar: string | null;
+  setAuth: (token: string, user: { email: string; role: UserRole; domain: string; displayName?: string; avatar?: string }) => void;
+  setAvatar: (avatar: string) => void;
   clearAuth: () => void;
 }
 
@@ -22,14 +24,17 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       domain: null,
       displayName: null,
+      avatar: null,
       setAuth: (accessToken, user) => set({
         accessToken,
         email: user.email,
         role: user.role,
         domain: user.domain,
         displayName: user.displayName ?? null,
+        avatar: user.avatar ?? null,
       }),
-      clearAuth: () => set({ accessToken: null, email: null, role: null, domain: null, displayName: null }),
+      setAvatar: (avatar) => set({ avatar }),
+      clearAuth: () => set({ accessToken: null, email: null, role: null, domain: null, displayName: null, avatar: null }),
     }),
     { name: "auth" }
   )
@@ -47,6 +52,7 @@ interface MailState {
   selectedFolder: string;
   selectedUid: number | null;
   selectedUids: Set<number>;
+  searchQuery: string;
   composeOpen: boolean;
   replyTo: ReplyContext | null;
   setFolder: (folder: string) => void;
@@ -54,6 +60,7 @@ interface MailState {
   toggleSelectUid: (uid: number) => void;
   selectAllUids: (uids: number[]) => void;
   clearSelection: () => void;
+  setSearchQuery: (q: string) => void;
   openCompose: (replyTo?: ReplyContext | null) => void;
   closeCompose: () => void;
 }
@@ -62,6 +69,7 @@ export const useMailStore = create<MailState>()((set) => ({
   selectedFolder: "INBOX",
   selectedUid: null,
   selectedUids: new Set<number>(),
+  searchQuery: "",
   composeOpen: false,
   replyTo: null,
   setFolder: (selectedFolder) => set({ selectedFolder, selectedUid: null, selectedUids: new Set() }),
@@ -73,6 +81,7 @@ export const useMailStore = create<MailState>()((set) => ({
   }),
   selectAllUids: (uids) => set({ selectedUids: new Set(uids) }),
   clearSelection: () => set({ selectedUids: new Set() }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
   openCompose: (replyTo = null) => set({ composeOpen: true, replyTo }),
   closeCompose: () => set({ composeOpen: false, replyTo: null }),
 }));
@@ -113,7 +122,7 @@ interface UiThemeState {
 export const useUiThemeStore = create<UiThemeState>()(
   persist(
     (set) => ({
-      appBg: "#eef2ff",
+      appBg: "#f5f7fb",
       setAppBg: (appBg) => set({ appBg }),
     }),
     { name: "ui-theme" }

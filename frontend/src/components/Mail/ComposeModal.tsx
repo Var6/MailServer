@@ -14,9 +14,25 @@ import LinkExt from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
-import { useMailStore, useToastStore } from "../../store/index.ts";
+import { useMailStore, useToastStore, useAuthStore, useUiThemeStore } from "../../store/index.ts";
 import { sendMail } from "../../api/mailApi.ts";
-import { formatBytes } from "../../lib/utils.ts";
+import { formatBytes, avatarColor } from "../../lib/utils.ts";
+
+const DARK_TEXT_COLORS = ["#f3f4f6", "#f1f5f9", "#f3e8ff", "#e9d5ff", "#f0f9ff", "#f9fafb", "#fce7f3"];
+const BG_THEMES = [
+  { bg: "#eef2ff", text: "#1f2937" }, { bg: "#f5f7fb", text: "#1f2937" },
+  { bg: "#e9f5ff", text: "#1f2937" }, { bg: "#f4efe6", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", text: "#1f2937" },
+  { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", text: "#1f2937" },
+  { bg: "#1f2937", text: "#f3f4f6" }, { bg: "#0f172a", text: "#f1f5f9" },
+  { bg: "#1e1b4b", text: "#f3e8ff" }, { bg: "#0c0a1e", text: "#e9d5ff" },
+  { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", text: "#f0f9ff" },
+  { bg: "linear-gradient(120deg,#1f2937,#111827)", text: "#f9fafb" },
+  { bg: "linear-gradient(120deg,#1e293b,#0f172a)", text: "#f1f5f9" },
+  { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", text: "#fce7f3" },
+];
 
 const DRAFT_KEY = "mail_draft";
 const RECIPIENTS_KEY = "mail_known_recipients";
@@ -74,6 +90,23 @@ function saveRecipientsFromField(field: string) {
 export default function ComposeModal() {
   const { closeCompose, replyTo } = useMailStore();
   const { addToast } = useToastStore();
+  const { email: authEmail, displayName: authName, avatar } = useAuthStore();
+  const appBg = useUiThemeStore((s) => s.appBg);
+  const themeMatch = BG_THEMES.find(t => t.bg === appBg);
+  const isDark = DARK_TEXT_COLORS.includes(themeMatch?.text ?? "");
+  const t = {
+    bg: isDark ? "#1f2937" : "#ffffff",
+    text: isDark ? "#e5e7eb" : "#202124",
+    muted: isDark ? "#9ca3af" : "#5f6368",
+    border: isDark ? "#374151" : "#e5e7eb",
+    borderLight: isDark ? "#2d3748" : "#f3f4f6",
+    toolbar: isDark ? "#111827" : "#f9fafb",
+    inputBg: isDark ? "#111827" : "#ffffff",
+    hoverBg: isDark ? "#374151" : "#f3f4f6",
+    attachBg: isDark ? "#1e3a5f" : "#eff6ff",
+    attachBorder: isDark ? "#2563eb44" : "#dbeafe",
+    titleBar: isDark ? "#111827" : "#404040",
+  };
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -279,9 +312,11 @@ export default function ComposeModal() {
   const isBodyEmpty = !editor || editor.isEmpty;
 
   return (
-    <div className={`${containerClass} bg-white shadow-2xl flex flex-col z-50 overflow-hidden border border-gray-200`}>
+    <div className={`${containerClass} shadow-2xl flex flex-col z-50 overflow-hidden border`}
+      style={{ backgroundColor: t.bg, borderColor: t.border }}>
       {/* Title bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#404040] text-white rounded-t-2xl flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 text-white rounded-t-2xl flex-shrink-0"
+        style={{ backgroundColor: t.titleBar }}>
         <span className="text-sm font-medium truncate max-w-[380px]">{subject || "New Message"}</span>
         <div className="flex items-center gap-1">
           <button onClick={() => setMinimized(true)} className="p-1 hover:bg-white/10 rounded-sm" title="Minimize">
@@ -297,11 +332,23 @@ export default function ComposeModal() {
       </div>
 
       {/* Header fields */}
-      <div className="flex flex-col flex-shrink-0 border-b border-gray-200">
+      <div className="flex flex-col flex-shrink-0 border-b" style={{ borderColor: t.border }}>
+        {/* From field with avatar */}
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b" style={{ borderColor: t.borderLight }}>
+          {avatar ? (
+            <img src={avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className={`avatar ${avatarColor(authEmail ?? "")} w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0`}>
+              {(authName || authEmail)?.[0]?.toUpperCase() ?? "?"}
+            </div>
+          )}
+          <span className="text-xs" style={{ color: t.muted }}>From</span>
+          <span className="text-sm truncate" style={{ color: t.text }}>{authName ? `${authName} <${authEmail}>` : authEmail}</span>
+        </div>
         {/* To field with autocomplete */}
         <div className="relative">
-          <div className="flex items-center gap-0 px-4 border-b border-gray-100">
-            <span className="text-xs text-[#5f6368] w-6 flex-shrink-0">To</span>
+          <div className="flex items-center gap-0 px-4 border-b" style={{ borderColor: t.borderLight }}>
+            <span className="text-xs w-6 flex-shrink-0" style={{ color: t.muted }}>To</span>
             <input
               value={to}
               onChange={e => handleToChange(e.target.value)}
@@ -315,21 +362,26 @@ export default function ComposeModal() {
               }}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="Recipients"
-              className="flex-1 outline-none text-sm py-2 text-[#202124] placeholder-[#5f6368]"
+              className="flex-1 outline-none text-sm py-2 bg-transparent"
+              style={{ color: t.text }}
               autoFocus={!replyTo}
             />
-            <div className="flex items-center gap-1 text-xs text-[#5f6368]">
-              {!showCc  && <button onClick={() => setShowCc(true)}  className="hover:text-[#202124] px-1">Cc</button>}
-              {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-[#202124] px-1">Bcc</button>}
+            <div className="flex items-center gap-1 text-xs" style={{ color: t.muted }}>
+              {!showCc  && <button onClick={() => setShowCc(true)}  className="px-1 hover:opacity-80">Cc</button>}
+              {!showBcc && <button onClick={() => setShowBcc(true)} className="px-1 hover:opacity-80">Bcc</button>}
             </div>
           </div>
           {showSuggestions && toSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-40 overflow-y-auto">
+            <div className="absolute left-0 right-0 top-full rounded-lg shadow-lg z-20 py-1 max-h-40 overflow-y-auto border"
+              style={{ backgroundColor: t.bg, borderColor: t.border }}>
               {toSuggestions.map(email => (
                 <button
                   key={email}
                   onMouseDown={() => pickSuggestion(email)}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-[#202124]"
+                  className="w-full text-left px-4 py-2 text-sm hover:opacity-80"
+                  style={{ color: t.text }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = t.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
                   {email}
                 </button>
@@ -339,47 +391,49 @@ export default function ComposeModal() {
         </div>
 
         {showCc && (
-          <FieldRow label="Cc">
+          <FieldRow label="Cc" borderColor={t.borderLight} mutedColor={t.muted}>
             <input value={cc} onChange={e => setCc(e.target.value)} placeholder="Cc recipients"
-              className="flex-1 outline-none text-sm py-2 placeholder-[#5f6368]" />
+              className="flex-1 outline-none text-sm py-2 bg-transparent" style={{ color: t.text }} />
           </FieldRow>
         )}
         {showBcc && (
-          <FieldRow label="Bcc">
+          <FieldRow label="Bcc" borderColor={t.borderLight} mutedColor={t.muted}>
             <input value={bcc} onChange={e => setBcc(e.target.value)} placeholder="Bcc recipients"
-              className="flex-1 outline-none text-sm py-2 placeholder-[#5f6368]" />
+              className="flex-1 outline-none text-sm py-2 bg-transparent" style={{ color: t.text }} />
           </FieldRow>
         )}
-        <FieldRow>
+        <FieldRow borderColor={t.borderLight} mutedColor={t.muted}>
           <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject"
-            className="flex-1 outline-none text-sm py-2 placeholder-[#5f6368] font-medium" />
+            className="flex-1 outline-none text-sm py-2 font-medium bg-transparent" style={{ color: t.text }} />
         </FieldRow>
       </div>
 
       {/* Formatting toolbar */}
-      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 flex-shrink-0 flex-wrap bg-gray-50">
-        <ToolbarBtn title="Bold"          active={!!editor?.isActive("bold")}      onClick={() => editor?.chain().focus().toggleBold().run()}><Bold size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Italic"        active={!!editor?.isActive("italic")}    onClick={() => editor?.chain().focus().toggleItalic().run()}><Italic size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Underline"     active={!!editor?.isActive("underline")} onClick={() => editor?.chain().focus().toggleUnderline().run()}><Underline size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Strikethrough" active={!!editor?.isActive("strike")}    onClick={() => editor?.chain().focus().toggleStrike().run()}><Strikethrough size={14} /></ToolbarBtn>
-        <div className="w-px h-4 bg-gray-300 mx-1" />
-        <ToolbarBtn title="Heading"       active={!!editor?.isActive("heading", { level: 2 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Bullet list"   active={!!editor?.isActive("bulletList")}  onClick={() => editor?.chain().focus().toggleBulletList().run()}><List size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Numbered list" active={!!editor?.isActive("orderedList")} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered size={14} /></ToolbarBtn>
-        <div className="w-px h-4 bg-gray-300 mx-1" />
-        <ToolbarBtn title="Align left"   active={!!editor?.isActive({ textAlign: "left" })}   onClick={() => editor?.chain().focus().setTextAlign("left").run()}><AlignLeft size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Align center" active={!!editor?.isActive({ textAlign: "center" })} onClick={() => editor?.chain().focus().setTextAlign("center").run()}><AlignCenter size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Align right"  active={!!editor?.isActive({ textAlign: "right" })}  onClick={() => editor?.chain().focus().setTextAlign("right").run()}><AlignRight size={14} /></ToolbarBtn>
-        <div className="w-px h-4 bg-gray-300 mx-1" />
-        <ToolbarBtn title="Insert link"       active={!!editor?.isActive("link")} onClick={setLink}><Link2 size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Undo"              active={false} onClick={() => editor?.chain().focus().undo().run()}><Undo2 size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Redo"              active={false} onClick={() => editor?.chain().focus().redo().run()}><Redo2 size={14} /></ToolbarBtn>
-        <ToolbarBtn title="Clear formatting"  active={false} onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()}><RemoveFormatting size={14} /></ToolbarBtn>
+      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b flex-shrink-0 flex-wrap"
+        style={{ borderColor: t.borderLight, backgroundColor: t.toolbar }}>
+        <ToolbarBtn title="Bold"          active={!!editor?.isActive("bold")}      onClick={() => editor?.chain().focus().toggleBold().run()} isDark={isDark}><Bold size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Italic"        active={!!editor?.isActive("italic")}    onClick={() => editor?.chain().focus().toggleItalic().run()} isDark={isDark}><Italic size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Underline"     active={!!editor?.isActive("underline")} onClick={() => editor?.chain().focus().toggleUnderline().run()} isDark={isDark}><Underline size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Strikethrough" active={!!editor?.isActive("strike")}    onClick={() => editor?.chain().focus().toggleStrike().run()} isDark={isDark}><Strikethrough size={14} /></ToolbarBtn>
+        <div className="w-px h-4 mx-1" style={{ backgroundColor: isDark ? "#4b5563" : "#d1d5db" }} />
+        <ToolbarBtn title="Heading"       active={!!editor?.isActive("heading", { level: 2 })} onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} isDark={isDark}><Heading2 size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Bullet list"   active={!!editor?.isActive("bulletList")}  onClick={() => editor?.chain().focus().toggleBulletList().run()} isDark={isDark}><List size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Numbered list" active={!!editor?.isActive("orderedList")} onClick={() => editor?.chain().focus().toggleOrderedList().run()} isDark={isDark}><ListOrdered size={14} /></ToolbarBtn>
+        <div className="w-px h-4 mx-1" style={{ backgroundColor: isDark ? "#4b5563" : "#d1d5db" }} />
+        <ToolbarBtn title="Align left"   active={!!editor?.isActive({ textAlign: "left" })}   onClick={() => editor?.chain().focus().setTextAlign("left").run()} isDark={isDark}><AlignLeft size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Align center" active={!!editor?.isActive({ textAlign: "center" })} onClick={() => editor?.chain().focus().setTextAlign("center").run()} isDark={isDark}><AlignCenter size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Align right"  active={!!editor?.isActive({ textAlign: "right" })}  onClick={() => editor?.chain().focus().setTextAlign("right").run()} isDark={isDark}><AlignRight size={14} /></ToolbarBtn>
+        <div className="w-px h-4 mx-1" style={{ backgroundColor: isDark ? "#4b5563" : "#d1d5db" }} />
+        <ToolbarBtn title="Insert link"       active={!!editor?.isActive("link")} onClick={setLink} isDark={isDark}><Link2 size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Undo"              active={false} onClick={() => editor?.chain().focus().undo().run()} isDark={isDark}><Undo2 size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Redo"              active={false} onClick={() => editor?.chain().focus().redo().run()} isDark={isDark}><Redo2 size={14} /></ToolbarBtn>
+        <ToolbarBtn title="Clear formatting"  active={false} onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()} isDark={isDark}><RemoveFormatting size={14} /></ToolbarBtn>
       </div>
 
       {/* Body */}
       <div
         className={`flex-1 overflow-y-auto px-4 py-3 ${fullscreen ? "min-h-[400px]" : ""}`}
+        style={{ color: t.text }}
         onClick={() => editor?.chain().focus().run()}
       >
         <EditorContent editor={editor} />
@@ -387,12 +441,13 @@ export default function ComposeModal() {
 
       {/* Attachments list */}
       {attachments.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap gap-2 flex-shrink-0">
+        <div className="px-4 py-2 border-t flex flex-wrap gap-2 flex-shrink-0" style={{ borderColor: t.borderLight }}>
           {attachments.map((a, i) => (
-            <div key={i} className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 text-xs">
+            <div key={i} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs border"
+              style={{ backgroundColor: t.attachBg, borderColor: t.attachBorder }}>
               <FileText size={12} className="text-blue-500 flex-shrink-0" />
-              <span className="max-w-[120px] truncate text-[#202124]">{a.filename}</span>
-              <span className="text-[#5f6368]">{formatBytes(a.size)}</span>
+              <span className="max-w-[120px] truncate" style={{ color: t.text }}>{a.filename}</span>
+              <span style={{ color: t.muted }}>{formatBytes(a.size)}</span>
               <button onClick={() => removeAttachment(i)} className="text-gray-400 hover:text-red-500 ml-0.5">
                 <X size={12} />
               </button>
@@ -403,10 +458,10 @@ export default function ComposeModal() {
 
       {/* Upload progress */}
       {(attachmentPrep.active || (mutation.isPending && sendUploadProgress !== null)) && (
-        <div className="px-4 py-2 border-t border-gray-100 bg-blue-50/50 flex-shrink-0 space-y-1.5">
+        <div className="px-4 py-2 border-t flex-shrink-0 space-y-1.5" style={{ borderColor: t.borderLight, backgroundColor: t.attachBg }}>
           {attachmentPrep.active && (
             <>
-              <div className="flex items-center justify-between text-xs text-[#202124]">
+              <div className="flex items-center justify-between text-xs" style={{ color: t.text }}>
                 <span className="truncate pr-2">Preparing attachment: {attachmentPrep.fileName}</span>
                 <span>{attachmentPrep.progress}%</span>
               </div>
@@ -417,7 +472,7 @@ export default function ComposeModal() {
           )}
           {mutation.isPending && sendUploadProgress !== null && (
             <>
-              <div className="flex items-center justify-between text-xs text-[#202124]">
+              <div className="flex items-center justify-between text-xs" style={{ color: t.text }}>
                 <span>Uploading email payload</span>
                 <span>{sendUploadProgress}%</span>
               </div>
