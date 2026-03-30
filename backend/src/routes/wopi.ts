@@ -14,9 +14,38 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import path from "path";
 import fs from "fs";
+import http from "http";
 import { userRootPath } from "../services/localFileService.js";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config/index.js";
+
+// Fetch the editor URL from Collabora's discovery endpoint
+// Returns something like "https://collabora:9980/browser/38f303a437/cool.html?"
+let cachedEditorBase: string | null = null;
+async function getEditorBase(): Promise<string> {
+  if (cachedEditorBase) return cachedEditorBase;
+  return new Promise((resolve) => {
+    http.get("http://collabora:9980/hosting/discovery", (res) => {
+      let data = "";
+      res.on("data", c => data += c);
+      res.on("end", () => {
+        const m = data.match(/urlsrc="([^"]+)"/);
+        if (m) {
+          // Convert internal collabora hostname to relative path for the browser
+          // e.g. https://collabora:9980/browser/abc123/cool.html? → /browser/abc123/cool.html
+          const url = new URL(m[1]);
+          cachedEditorBase = url.pathname.replace(/\?$/, "");
+        } else {
+          cachedEditorBase = "/browser/dist/cool.html";
+        }
+        resolve(cachedEditorBase!);
+      });
+    }).on("error", () => {
+      cachedEditorBase = "/browser/dist/cool.html";
+      resolve(cachedEditorBase);
+    });
+  });
+}
 
 const router = Router();
 
@@ -48,7 +77,7 @@ function wopiAuth(req: Request, res: Response, next: NextFunction): void {
 
 // ── POST /wopi/token?path=/dir/file.xlsx ─────────────────────────────────────
 // Called by the frontend (with user Bearer JWT) to get a short-lived WOPI token.
-router.post("/token", requireAuth, (req: Request, res: Response): void => {
+router.post("/token", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const filePath = sanitizePath((req.query.path as string) ?? "");
   if (!filePath || filePath === "/") {
     res.status(400).json({ error: "path required" });
@@ -58,12 +87,15 @@ router.post("/token", requireAuth, (req: Request, res: Response): void => {
   const email = req.user!.sub;
   const fileId = makeFileId(email, filePath);
   const token = jwt.sign({ sub: email, path: filePath }, config.JWT_SECRET, { expiresIn: "1h" });
+  const editorPath = await getEditorBase();
 
   res.json({
     token,
     tokenTtl: Date.now() + 3600 * 1000,
     // Collabora calls this URL directly — use internal Docker hostname
     wopiSrc: `http://api:3000/wopi/files/${fileId}`,
+    // editorPath is the browser-relative path, e.g. /browser/38f303a437/cool.html
+    editorPath,
     fileId,
   });
 });

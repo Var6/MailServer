@@ -112,11 +112,11 @@ export default function FilesPage() {
     try {
       const filePath = dirPath + name;
       const { data } = await apiClient.post(`/wopi/token?path=${encodeURIComponent(filePath)}`);
-      const wopiSrc = encodeURIComponent(data.wopiSrc);
-      const token   = encodeURIComponent(data.token);
-      const ttl     = data.tokenTtl;
-      // Use current origin so the proxy (dev) or nginx (prod) routes /cool correctly
-      const url = `${window.location.origin}/cool/cool.html?WOPISrc=${wopiSrc}&access_token=${token}&access_token_ttl=${ttl}`;
+      const wopiSrc    = encodeURIComponent(data.wopiSrc);
+      const token      = encodeURIComponent(data.token);
+      const ttl        = data.tokenTtl;
+      const editorPath = data.editorPath ?? "/browser/dist/cool.html";
+      const url = `${window.location.origin}${editorPath}?WOPISrc=${wopiSrc}&access_token=${token}&access_token_ttl=${ttl}`;
       window.open(url, "_blank", "noopener");
     } catch {
       addToast("Could not open editor", "error");
