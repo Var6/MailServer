@@ -90,12 +90,13 @@ services:
     image: collabora/code:latest
     container_name: mailserver-collabora
     restart: unless-stopped
+    cap_add:
+      - MKNOD
     environment:
-      # WOPI host that Collabora is allowed to contact (our API on internal network)
-      aliasgroup1: "http://api:3000"
-      # Disable built-in SSL — nginx terminates TLS
       DONT_GEN_SSL_CERT: "YES"
-      extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:logging.level=warning"
+      extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:logging.level=warning --o:mount_jail_tree=false --o:security.capabilities=false"
+      # Allow our API as a WOPI host
+      aliasgroup1: "http://api:3000"
     networks:
       - mailnet
 

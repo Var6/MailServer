@@ -111,24 +111,17 @@ router.get("/files/:fileId/contents", wopiAuth, (req: Request, res: Response): v
 });
 
 // ── POST /wopi/files/:fileId/contents  (PutFile — save from Collabora) ───────
+// express.raw() runs before this handler and puts the body in req.body as a Buffer
 router.post("/files/:fileId/contents", wopiAuth, (req: Request, res: Response): void => {
   try {
     const { email, path: filePath } = parseFileId(req.params.fileId);
     const abs = path.join(userRootPath(email), sanitizePath(filePath));
-
-    const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => chunks.push(c));
-    req.on("end", () => {
-      try {
-        fs.writeFileSync(abs, Buffer.concat(chunks));
-        res.status(200).json({ ok: true });
-      } catch {
-        res.status(500).json({ error: "Save failed" });
-      }
-    });
-    req.on("error", () => res.status(500).json({ error: "Stream error" }));
+    const body = req.body as Buffer;
+    if (!Buffer.isBuffer(body)) { res.status(400).json({ error: "No body" }); return; }
+    fs.writeFileSync(abs, body);
+    res.status(200).json({ ok: true });
   } catch {
-    res.status(404).json({ error: "File not found" });
+    res.status(500).json({ error: "Save failed" });
   }
 });
 

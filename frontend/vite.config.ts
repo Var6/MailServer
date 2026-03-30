@@ -9,6 +9,10 @@ export default defineConfig({
     proxy: {
       // API → Docker api container (exposed on 127.0.0.1:3001 in docker-compose.apps.yml)
       "/api": { target: "http://localhost:3001", changeOrigin: true, rewrite: p => p.replace(/^\/api/, "") },
+      // Collabora → nginx (which proxies to collabora:9980)
+      "/cool": { target: "http://localhost:8082", changeOrigin: true, ws: true },
+      "/browser": { target: "http://localhost:8082", changeOrigin: true },
+      "/hosting": { target: "http://localhost:8082", changeOrigin: true },
     },
   },
   build: {

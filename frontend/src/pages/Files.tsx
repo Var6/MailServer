@@ -4,11 +4,11 @@ import { useDropzone } from "react-dropzone";
 import {
   Folder, FileText, Upload, ChevronRight, Image, FileSpreadsheet,
   Presentation, FileCode, Film, Music, Plus, FolderPlus, Table,
-  Download, Trash2, Pencil, X,
+  Download, Trash2, Pencil,
 } from "lucide-react";
 import { apiClient } from "../api/client.ts";
 import { formatBytes } from "../lib/utils.ts";
-import { useToastStore, useAuthStore } from "../store/index.ts";
+import { useToastStore } from "../store/index.ts";
 import { useTheme } from "../lib/themes.ts";
 
 function fileExt(name: string) { return name.split(".").pop()?.toLowerCase() ?? ""; }
@@ -46,12 +46,9 @@ export default function FilesPage() {
   const [newName, setNewName]             = useState("");
   const [hovered, setHovered]             = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [collaboraUrl, setCollaboraUrl]   = useState<string | null>(null);
-  const [collaboraName, setCollaboraName] = useState("");
   const newRef   = useRef<HTMLDivElement>(null);
   const [uploads, setUploads]             = useState<UploadEntry[]>([]);
   const { addToast }                      = useToastStore();
-  const { accessToken }                   = useAuthStore();
   const { appBg, textColor, isDark }      = useTheme();
   const border   = isDark ? "#374151" : "#e5e7eb";
   const muted    = isDark ? "#9ca3af" : "#6b7280";
@@ -118,8 +115,9 @@ export default function FilesPage() {
       const wopiSrc = encodeURIComponent(data.wopiSrc);
       const token   = encodeURIComponent(data.token);
       const ttl     = data.tokenTtl;
-      setCollaboraName(name);
-      setCollaboraUrl(`/cool/cool.html?WOPISrc=${wopiSrc}&access_token=${token}&access_token_ttl=${ttl}`);
+      // Use current origin so the proxy (dev) or nginx (prod) routes /cool correctly
+      const url = `${window.location.origin}/cool/cool.html?WOPISrc=${wopiSrc}&access_token=${token}&access_token_ttl=${ttl}`;
+      window.open(url, "_blank", "noopener");
     } catch {
       addToast("Could not open editor", "error");
     }
@@ -276,21 +274,6 @@ export default function FilesPage() {
               <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-1.5 rounded-lg text-sm bg-red-600 text-white hover:bg-red-700">Delete</button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Collabora editor modal */}
-      {collaboraUrl && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: isDark ? "#111827" : "#f9fafb" }}>
-          <div className="flex items-center gap-3 px-4 py-2 border-b flex-shrink-0" style={{ borderColor: border, backgroundColor: isDark ? "#1f2937" : "#ffffff" }}>
-            <button onClick={() => { setCollaboraUrl(null); setCollaboraName(""); refetch(); }}
-              className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors" title="Close">
-              <X size={16} />
-            </button>
-            <span className="text-sm font-medium truncate" style={{ color: textColor }}>{collaboraName}</span>
-            <span className="text-xs ml-auto" style={{ color: muted }}>Auto-saves • Close when done</span>
-          </div>
-          <iframe src={collaboraUrl} className="flex-1 w-full border-0" allow="clipboard-read; clipboard-write" />
         </div>
       )}
 
