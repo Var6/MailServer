@@ -91,7 +91,7 @@ export default function Sidebar() {
   const themeRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const currentTheme = typeof appBg === "string" && BG_THEMES.find(t => t.bg === appBg);
+  const currentTheme = typeof appBg === "string" ? BG_THEMES.find(t => t.bg === appBg) : undefined;
   const textColor = currentTheme?.text || "#1f2937";
   const isDark = textColor === "#f3f4f6" || textColor === "#f1f5f9" || textColor === "#e9d5ff" || textColor === "#fce7f3" || textColor === "#f0f9ff" || textColor === "#f9fafb";
 

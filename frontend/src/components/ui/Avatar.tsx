@@ -1,6 +1,4 @@
-'use client'
-
-import { getInitials } from '@/lib/utils'
+import { senderInitial } from '../../lib/utils'
 
 interface AvatarProps {
   name: string
@@ -24,7 +22,7 @@ export function Avatar({ name, color = '#667eea', size = 'md', className = '' }:
       style={{ backgroundColor: color }}
       aria-label={name}
     >
-      {getInitials(name)}
+      {senderInitial(name)}
     </div>
   )
 }
