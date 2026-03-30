@@ -29,11 +29,14 @@ const OFFICE_EXTS = new Set(["doc","docx","odt","xls","xlsx","ods","csv","ppt","
 function isOfficeFile(name: string) { return OFFICE_EXTS.has(fileExt(name)); }
 
 const NEW_OPTIONS = [
-  { ext: "folder", label: "New Folder",       icon: FolderPlus },
-  { ext: "txt",    label: "Text Document",     icon: FileText   },
-  { ext: "md",     label: "Markdown",          icon: FileCode   },
-  { ext: "csv",    label: "Spreadsheet (CSV)", icon: Table      },
-  { ext: "html",   label: "HTML Page",         icon: FileCode   },
+  { ext: "folder", label: "New Folder",        icon: FolderPlus     },
+  { ext: "docx",   label: "Word Document",     icon: FileText       },
+  { ext: "xlsx",   label: "Excel Spreadsheet", icon: FileSpreadsheet },
+  { ext: "pptx",   label: "PowerPoint",        icon: Presentation   },
+  { ext: "txt",    label: "Text Document",     icon: FileText       },
+  { ext: "csv",    label: "Spreadsheet (CSV)", icon: Table          },
+  { ext: "md",     label: "Markdown",          icon: FileCode       },
+  { ext: "html",   label: "HTML Page",         icon: FileCode       },
 ] as const;
 
 type UploadEntry = { name: string; progress: number; status: "uploading" | "done" | "error" };
