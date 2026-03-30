@@ -4,34 +4,12 @@ import { useDropzone } from "react-dropzone";
 import {
   Folder, FileText, Upload, ChevronRight, Image, FileSpreadsheet,
   Presentation, FileCode, Film, Music, Plus, FolderPlus, Table,
-  Download, Trash2,
+  Download, Trash2, Pencil, X,
 } from "lucide-react";
 import { apiClient } from "../api/client.ts";
 import { formatBytes } from "../lib/utils.ts";
-import { useToastStore, useUiThemeStore } from "../store/index.ts";
-
-const BG_THEMES = [
-  { bg: "#eef2ff", text: "#1f2937" }, { bg: "#f5f7fb", text: "#1f2937" },
-  { bg: "#e9f5ff", text: "#1f2937" }, { bg: "#f4efe6", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", text: "#1f2937" },
-  { bg: "#1f2937", text: "#f3f4f6" }, { bg: "#0f172a", text: "#f1f5f9" },
-  { bg: "#1e1b4b", text: "#f3e8ff" }, { bg: "#0c0a1e", text: "#e9d5ff" },
-  { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", text: "#f0f9ff" },
-  { bg: "linear-gradient(120deg,#1f2937,#111827)", text: "#f9fafb" },
-  { bg: "linear-gradient(120deg,#1e293b,#0f172a)", text: "#f1f5f9" },
-  { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", text: "#fce7f3" },
-];
-const DARK_TEXTS = new Set(["#f3f4f6","#f1f5f9","#f3e8ff","#e9d5ff","#f0f9ff","#f9fafb","#fce7f3"]);
-
-function useTheme() {
-  const appBg = useUiThemeStore(s => s.appBg);
-  const found = BG_THEMES.find(t => t.bg === appBg);
-  const textColor = found?.text ?? "#1f2937";
-  return { appBg, textColor, isDark: DARK_TEXTS.has(textColor) };
-}
+import { useToastStore, useAuthStore } from "../store/index.ts";
+import { useTheme } from "../lib/themes.ts";
 
 function fileExt(name: string) { return name.split(".").pop()?.toLowerCase() ?? ""; }
 
@@ -46,6 +24,9 @@ function FileIcon({ name, isDir }: { name: string; isDir?: boolean }) {
   if (["txt","md","html","json","xml","csv"].includes(ext))  return <FileCode size={32} className="text-blue-400" />;
   return <FileText size={32} className="text-blue-500" />;
 }
+
+const OFFICE_EXTS = new Set(["doc","docx","odt","xls","xlsx","ods","csv","ppt","pptx","odp","odg","odf"]);
+function isOfficeFile(name: string) { return OFFICE_EXTS.has(fileExt(name)); }
 
 const NEW_OPTIONS = [
   { ext: "folder", label: "New Folder",       icon: FolderPlus },
@@ -65,9 +46,12 @@ export default function FilesPage() {
   const [newName, setNewName]             = useState("");
   const [hovered, setHovered]             = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [collaboraUrl, setCollaboraUrl]   = useState<string | null>(null);
+  const [collaboraName, setCollaboraName] = useState("");
   const newRef   = useRef<HTMLDivElement>(null);
   const [uploads, setUploads]             = useState<UploadEntry[]>([]);
   const { addToast }                      = useToastStore();
+  const { accessToken }                   = useAuthStore();
   const { appBg, textColor, isDark }      = useTheme();
   const border   = isDark ? "#374151" : "#e5e7eb";
   const muted    = isDark ? "#9ca3af" : "#6b7280";
@@ -125,6 +109,20 @@ export default function FilesPage() {
       setDeleteConfirm(null);
       refetch();
     } catch { addToast("Failed to delete", "error"); }
+  };
+
+  const handleEdit = async (name: string) => {
+    try {
+      const filePath = dirPath + name;
+      const { data } = await apiClient.post(`/wopi/token?path=${encodeURIComponent(filePath)}`);
+      const wopiSrc = encodeURIComponent(data.wopiSrc);
+      const token   = encodeURIComponent(data.token);
+      const ttl     = data.tokenTtl;
+      setCollaboraName(name);
+      setCollaboraUrl(`/cool/cool.html?WOPISrc=${wopiSrc}&access_token=${token}&access_token_ttl=${ttl}`);
+    } catch {
+      addToast("Could not open editor", "error");
+    }
   };
 
   const handleDownload = (name: string) => {
@@ -281,6 +279,21 @@ export default function FilesPage() {
         </div>
       )}
 
+      {/* Collabora editor modal */}
+      {collaboraUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: isDark ? "#111827" : "#f9fafb" }}>
+          <div className="flex items-center gap-3 px-4 py-2 border-b flex-shrink-0" style={{ borderColor: border, backgroundColor: isDark ? "#1f2937" : "#ffffff" }}>
+            <button onClick={() => { setCollaboraUrl(null); setCollaboraName(""); refetch(); }}
+              className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors" title="Close">
+              <X size={16} />
+            </button>
+            <span className="text-sm font-medium truncate" style={{ color: textColor }}>{collaboraName}</span>
+            <span className="text-xs ml-auto" style={{ color: muted }}>Auto-saves • Close when done</span>
+          </div>
+          <iframe src={collaboraUrl} className="flex-1 w-full border-0" allow="clipboard-read; clipboard-write" />
+        </div>
+      )}
+
       {/* File grid */}
       <div className="flex-1 overflow-auto scrollbar-thin p-5">
         {isLoading && (
@@ -316,6 +329,12 @@ export default function FilesPage() {
                 {!file.isDirectory && <span className="text-[10px] mt-0.5" style={{ color: muted }}>{formatBytes(file.size)}</span>}
                 {hovered === file.name && (
                   <div className="absolute top-1.5 right-1.5 flex gap-0.5">
+                    {!file.isDirectory && isOfficeFile(file.name) && (
+                      <button onClick={e => { e.stopPropagation(); handleEdit(file.name); }}
+                        className="p-1 rounded-lg bg-green-600 text-white hover:bg-green-700" title="Edit online">
+                        <Pencil size={11} />
+                      </button>
+                    )}
                     {!file.isDirectory && (
                       <button onClick={e => { e.stopPropagation(); handleDownload(file.name); }}
                         className="p-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700" title="Download">

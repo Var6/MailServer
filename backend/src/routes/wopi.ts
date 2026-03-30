@@ -1,0 +1,135 @@
+/**
+ * WOPI server — lets Collabora Online read/write files from local storage.
+ *
+ * Auth flow:
+ *   1. Frontend calls POST /wopi/token?path=... (with user JWT) → gets { token, tokenTtl, wopiSrc }
+ *   2. Frontend opens /cool/cool.html?WOPISrc=<wopiSrc>&access_token=<token>
+ *   3. Collabora calls GET /wopi/files/:fileId?access_token=<token>  (CheckFileInfo)
+ *   4. Collabora calls GET /wopi/files/:fileId/contents              (GetFile)
+ *   5. Collabora calls POST /wopi/files/:fileId/contents             (PutFile / save)
+ */
+
+import { Router } from "express";
+import type { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import path from "path";
+import fs from "fs";
+import { userRootPath } from "../services/localFileService.js";
+import { requireAuth } from "../middleware/auth.js";
+import { config } from "../config/index.js";
+
+const router = Router();
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function makeFileId(email: string, filePath: string): string {
+  return Buffer.from(JSON.stringify({ email, path: filePath })).toString("base64url");
+}
+
+function parseFileId(fileId: string): { email: string; path: string } {
+  return JSON.parse(Buffer.from(fileId, "base64url").toString("utf8"));
+}
+
+function sanitizePath(p: string): string {
+  // strip any path-traversal attempts
+  return "/" + p.split("/").filter(s => s && s !== ".." && s !== ".").join("/");
+}
+
+function wopiAuth(req: Request, res: Response, next: NextFunction): void {
+  const token = req.query.access_token as string;
+  if (!token) { res.status(401).json({ error: "Missing access_token" }); return; }
+  try {
+    req.user = jwt.verify(token, config.JWT_SECRET) as any;
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid WOPI token" });
+  }
+}
+
+// ── POST /wopi/token?path=/dir/file.xlsx ─────────────────────────────────────
+// Called by the frontend (with user Bearer JWT) to get a short-lived WOPI token.
+router.post("/token", requireAuth, (req: Request, res: Response): void => {
+  const filePath = sanitizePath((req.query.path as string) ?? "");
+  if (!filePath || filePath === "/") {
+    res.status(400).json({ error: "path required" });
+    return;
+  }
+
+  const email = req.user!.sub;
+  const fileId = makeFileId(email, filePath);
+  const token = jwt.sign({ sub: email, path: filePath }, config.JWT_SECRET, { expiresIn: "1h" });
+
+  res.json({
+    token,
+    tokenTtl: Date.now() + 3600 * 1000,
+    // Collabora calls this URL directly — use internal Docker hostname
+    wopiSrc: `http://api:3000/wopi/files/${fileId}`,
+    fileId,
+  });
+});
+
+// ── GET /wopi/files/:fileId  (CheckFileInfo) ─────────────────────────────────
+router.get("/files/:fileId", wopiAuth, (req: Request, res: Response): void => {
+  try {
+    const { email, path: filePath } = parseFileId(req.params.fileId);
+    const abs = path.join(userRootPath(email), sanitizePath(filePath));
+    const stat = fs.statSync(abs);
+    const name = path.basename(abs);
+
+    res.json({
+      BaseFileName:          name,
+      Size:                  stat.size,
+      LastModifiedTime:      stat.mtime.toISOString(),
+      OwnerId:               email,
+      UserId:                email,
+      UserFriendlyName:      email.split("@")[0],
+      UserCanWrite:          true,
+      UserCanNotWriteRelative: true,
+      SupportsUpdate:        true,
+      SupportsLocks:         false,
+    });
+  } catch {
+    res.status(404).json({ error: "File not found" });
+  }
+});
+
+// ── GET /wopi/files/:fileId/contents  (GetFile) ───────────────────────────────
+router.get("/files/:fileId/contents", wopiAuth, (req: Request, res: Response): void => {
+  try {
+    const { email, path: filePath } = parseFileId(req.params.fileId);
+    const abs = path.join(userRootPath(email), sanitizePath(filePath));
+    const name = path.basename(abs);
+    const stat = fs.statSync(abs);
+
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(name)}"`);
+    res.setHeader("Content-Length", stat.size);
+    fs.createReadStream(abs).pipe(res);
+  } catch {
+    res.status(404).json({ error: "File not found" });
+  }
+});
+
+// ── POST /wopi/files/:fileId/contents  (PutFile — save from Collabora) ───────
+router.post("/files/:fileId/contents", wopiAuth, (req: Request, res: Response): void => {
+  try {
+    const { email, path: filePath } = parseFileId(req.params.fileId);
+    const abs = path.join(userRootPath(email), sanitizePath(filePath));
+
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => {
+      try {
+        fs.writeFileSync(abs, Buffer.concat(chunks));
+        res.status(200).json({ ok: true });
+      } catch {
+        res.status(500).json({ error: "Save failed" });
+      }
+    });
+    req.on("error", () => res.status(500).json({ error: "Stream error" }));
+  } catch {
+    res.status(404).json({ error: "File not found" });
+  }
+});
+
+export default router;

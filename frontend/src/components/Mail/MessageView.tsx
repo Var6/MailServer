@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { getMessage, flagMessage, deleteMessage, moveMessage, permanentDeleteMessage, downloadAttachment, openAttachmentOnline } from "../../api/mailApi.ts";
 import { apiClient } from "../../api/client.ts";
-import { useMailStore, useToastStore, useAuthStore, useUiThemeStore } from "../../store/index.ts";
+import { useMailStore, useToastStore, useAuthStore } from "../../store/index.ts";
+import { useTheme } from "../../lib/themes.ts";
 import { formatFullDate, avatarColor, senderInitial, senderName } from "../../lib/utils.ts";
 import { MessageSkeleton } from "../ui/Skeleton.tsx";
 import { formatBytes } from "../../lib/utils.ts";
@@ -20,25 +21,7 @@ export default function MessageView() {
   const [showDetails, setShowDetails] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const DARK_TEXT_COLORS = ["#f3f4f6", "#f1f5f9", "#f3e8ff", "#e9d5ff", "#f0f9ff", "#f9fafb", "#fce7f3"];
-  const BG_THEMES = [
-    { bg: "#eef2ff", text: "#1f2937" }, { bg: "#f5f7fb", text: "#1f2937" },
-    { bg: "#e9f5ff", text: "#1f2937" }, { bg: "#f4efe6", text: "#1f2937" },
-    { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", text: "#1f2937" },
-    { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", text: "#1f2937" },
-    { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", text: "#1f2937" },
-    { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", text: "#1f2937" },
-    { bg: "#1f2937", text: "#f3f4f6" }, { bg: "#0f172a", text: "#f1f5f9" },
-    { bg: "#1e1b4b", text: "#f3e8ff" }, { bg: "#0c0a1e", text: "#e9d5ff" },
-    { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", text: "#f0f9ff" },
-    { bg: "linear-gradient(120deg,#1f2937,#111827)", text: "#f9fafb" },
-    { bg: "linear-gradient(120deg,#1e293b,#0f172a)", text: "#f1f5f9" },
-    { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", text: "#fce7f3" },
-  ];
-  const appBg = useUiThemeStore((s) => s.appBg);
-  const foundTheme = BG_THEMES.find(t => t.bg === appBg);
-  const textColor = foundTheme?.text || "#1f2937";
-  const isDark = DARK_TEXT_COLORS.includes(textColor);
+  const { appBg, textColor, isDark } = useTheme();
   const mutedColor = isDark ? "#9ca3af" : "#5f6368";
   const border = isDark ? "#374151" : "#e5e7eb";
 
