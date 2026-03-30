@@ -2,8 +2,8 @@ version: "3.9"
 
 # ============================================================
 #  MailServer — Core Mail Stack
-#  All persistent data stored under D:\maildata\
-#  so it's visible, portable, and easy to back up.
+#  D:\maildata\  →  redis, dkim, files (NTFS-safe)
+#  Named volumes →  mongodb, mail, certs (need Linux FS)
 # ============================================================
 
 networks:
@@ -11,12 +11,14 @@ networks:
     driver: bridge
 
 volumes:
-  clamav_db:      # ClamAV virus DB — no need to back up, re-downloads automatically
-  mongodb_data:   # MongoDB MUST be on Linux FS (WiredTiger incompatible with NTFS bind-mounts)
+  clamav_db:    # ClamAV virus DB — re-downloads automatically
+  mongodb_data: # MongoDB WiredTiger requires Linux FS (NTFS crashes it)
+  mail_data:    # Dovecot Maildir requires POSIX uid/gid (NTFS can't do it)
+  cert_data:    # SSL certs — shared between Dovecot, Postfix, Nginx
 
 services:
 
-  # ── MongoDB (standalone) ──────────────────────────────────
+  # ── MongoDB ───────────────────────────────────────────────
   mongodb:
     image: mongo:7
     container_name: mailserver-mongodb
@@ -29,8 +31,6 @@ services:
     volumes:
       - mongodb_data:/data/db
       - ./config/mongodb/initdb.js:/docker-entrypoint-initdb.d/initdb.js:ro
-    ports:
-      - "27017:27017"
     networks:
       - mailnet
     healthcheck:
@@ -39,14 +39,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis (Rspamd + session cache) ───────────────────────
+  # ── Redis ─────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: mailserver-redis
     restart: unless-stopped
     command: redis-server /usr/local/etc/redis/redis.conf
-    ports:
-      - "127.0.0.1:6379:6379"
     volumes:
       - D:/maildata/redis:/data
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -69,8 +67,8 @@ services:
     env_file: .env
     hostname: ${MAIL_HOSTNAME}
     volumes:
-      - D:/maildata/mail:/var/mail/vhosts
-      - D:/maildata/certs:/etc/ssl/mailserver:ro
+      - mail_data:/var/mail/vhosts
+      - cert_data:/etc/ssl/mailserver:ro
       - D:/maildata/dkim:/etc/opendkim/keys
       - ./config/postfix/main.cf:/etc/postfix/main.cf
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
@@ -90,7 +88,7 @@ services:
     networks:
       - mailnet
 
-  # ── Dovecot (IMAP / POP3 / LMTP / SASL) ─────────────────
+  # ── Dovecot (IMAP / POP3 / LMTP) ─────────────────────────
   dovecot:
     build:
       context: ./docker/dovecot
@@ -100,8 +98,8 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - D:/maildata/mail:/var/mail/vhosts
-      - D:/maildata/certs:/etc/ssl/mailserver:ro
+      - mail_data:/var/mail/vhosts
+      - cert_data:/etc/ssl/mailserver:ro
       - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
       - ./config/dovecot/conf.d:/etc/dovecot/conf.d:ro
     ports:

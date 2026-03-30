@@ -1,25 +1,17 @@
 version: "3.9"
 
 # ============================================================
-#  MailServer — Application Layer
-#  docker-compose.apps.yml  (Windows / single-server edition)
-#
-#  Removed: HAProxy (Nginx handles everything)
-#           GlusterFS volume mounts → named Docker volumes
-#  Added:   cloudflared Tunnel service for public access
-#           cert_data named volume shared with core stack
+#  MailServer — Application Layer  (local-storage edition)
+#  No Nextcloud, no Collabora — files served directly from
+#  D:\maildata\files\ via the Node.js API.
 # ============================================================
 
 networks:
   mailnet:
 
-volumes:
-  nextcloud_html:   # Nextcloud PHP code — MUST be on Linux FS (rsync incompatible with NTFS)
-
 services:
 
   # ── Node.js REST API ──────────────────────────────────────
-  # Postfix TCP map listens on 10023 (internal only)
   api:
     build:
       context: ./backend
@@ -39,20 +31,17 @@ services:
       IMAP_PORT: 993
       SMTP_HOST: postfix
       SMTP_PORT: 587
-      NEXTCLOUD_URL: http://nextcloud
-      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
-      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
-      FILE_STORAGE_DRIVER: ${FILE_STORAGE_DRIVER:-local}
-      LOCAL_FILES_ROOT: ${LOCAL_FILES_ROOT:-/home/node/local-files}
-      LOCAL_FILES_HOST_PATH: ${LOCAL_FILES_HOST_PATH:-D:/MailLocalFiles}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
       MAIL_DOMAIN: ${MAIL_DOMAIN}
+      FILE_STORAGE_DRIVER: local
+      LOCAL_FILES_ROOT: /data/files
+      LOCAL_FILES_HOST_PATH: D:/maildata/files
     volumes:
-      - "${LOCAL_FILES_HOST_PATH:-D:/MailLocalFiles}:/home/node/local-files"
+      - D:/maildata/files:/data/files
     ports:
-      - "127.0.0.1:3001:3000"   # localhost only — used by start.bat for first-run setup
+      - "127.0.0.1:3001:3000"
     depends_on:
       - mongodb
       - redis
@@ -71,55 +60,13 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
-        VITE_NC_URL: /nextcloud
     image: mailserver-webmail:local
     container_name: mailserver-webmail
     restart: unless-stopped
     networks:
       - mailnet
 
-  # ── Nextcloud (Files / Calendar / Contacts / Office) ──────
-  nextcloud:
-    image: nextcloud:28-apache
-    container_name: mailserver-nextcloud
-    restart: unless-stopped
-    environment:
-      SQLITE_DATABASE: nextcloud
-      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
-      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
-      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:-localhost}
-      REDIS_HOST: redis
-      REDIS_HOST_PASSWORD: ${REDIS_PASSWORD}
-      SERVER_URL: ${SERVER_URL}
-    volumes:
-      - D:/maildata/files:/var/www/html/data
-      - nextcloud_html:/var/www/html
-      - ./config/nextcloud/nextcloud.config.php:/var/www/html/config/custom.config.php:ro
-    depends_on:
-      - redis
-    networks:
-      - mailnet
-
-  # ── Collabora Online (LibreOffice in browser) ─────────────
-  collabora:
-    image: collabora/code:latest
-    container_name: mailserver-collabora
-    restart: unless-stopped
-    cap_add:
-      - MKNOD
-    environment:
-      domain: ".*"                # accept requests from ANY domain (multi-tenant)
-      extra_params: --o:ssl.enable=false --o:ssl.termination=true
-      DONT_GEN_SSL_CERT: "YES"
-      server_name: ${SERVER_URL:-https://localhost}
-    networks:
-      - mailnet
-    deploy:
-      resources:
-        limits:
-          memory: 2g
-
-  # ── Nginx (reverse proxy — HTTP + HTTPS) ──────────────────
+  # ── Nginx (reverse proxy) ─────────────────────────────────
   nginx:
     image: nginx:alpine
     container_name: mailserver-nginx
@@ -131,56 +78,31 @@ services:
     volumes:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - D:/maildata/certs:/etc/ssl/mailserver:ro
-      - nextcloud_html:/var/www/nextcloud:ro
+      - cert_data:/etc/ssl/mailserver:ro
     depends_on:
       - api
       - webmail
-      - nextcloud
-      - collabora
     networks:
       - mailnet
 
-  # ── Cloudflare Tunnel (public access, no port forwarding) ─
-  #
-  #  Two ways to authenticate:
-  #   Option A (recommended) — tunnel token (easiest):
-  #     Set CLOUDFLARE_TUNNEL_TOKEN in .env, leave the volumes
-  #     section and config below commented out.
-  #   Option B — credentials JSON (more control):
-  #     Run setup-cloudflare.ps1, then uncomment the volumes
-  #     block and point config.yml at your tunnel ID.
-  #
-  #  Disable this service entirely if you prefer direct port
-  #  forwarding from your router.
-  # ─────────────────────────────────────────────────────────
+  # ── Cloudflare Tunnel (public HTTPS, no port forwarding) ──
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: mailserver-cloudflared
     restart: unless-stopped
-    # Option A — token-based (set CLOUDFLARE_TUNNEL_TOKEN in .env)
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    # Option B — credentials file (uncomment + comment out command above)
-    # command: tunnel --no-autoupdate run
-    # volumes:
-    #   - ./config/cloudflared:/etc/cloudflared:ro
     networks:
       - mailnet
     depends_on:
       - nginx
 
-  # ── Certbot (SSL renewal — only needed without Cloudflare) ─
-  #
-  #  If you use Cloudflare Tunnel you can use a Cloudflare
-  #  Origin Certificate instead of Let's Encrypt. Comment this
-  #  service out if you are using the tunnel.
-  # ─────────────────────────────────────────────────────────
+  # ── Certbot (SSL renewal — only if not using Cloudflare) ──
   certbot:
     profiles: ["ssl"]
     image: certbot/certbot:latest
     container_name: mailserver-certbot
     volumes:
-      - D:/maildata/certs:/etc/letsencrypt
+      - cert_data:/etc/letsencrypt
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     networks:
       - mailnet
