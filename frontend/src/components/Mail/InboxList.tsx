@@ -2,39 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Star, Paperclip, RefreshCw, X, Trash2, Archive, MailOpen, Mail } from "lucide-react";
 import { useMemo } from "react";
 import { getMessages, flagMessage, deleteMessage, moveMessage } from "../../api/mailApi.ts";
-import { useMailStore, useToastStore, useUiThemeStore } from "../../store/index.ts";
+import { useMailStore, useToastStore } from "../../store/index.ts";
+import { useTheme } from "../../lib/themes.ts";
 import { formatMailDate, avatarColor, senderInitial, senderName, stripHtml } from "../../lib/utils.ts";
 import { MailListSkeleton } from "../ui/Skeleton.tsx";
 import type { MailHeader } from "../../types/index.ts";
 
-const DARK_TEXT_COLORS = ["#f3f4f6", "#f1f5f9", "#f3e8ff", "#e9d5ff", "#f0f9ff", "#f9fafb", "#fce7f3"];
-
-const BG_THEMES = [
-  { bg: "#eef2ff", text: "#1f2937" },
-  { bg: "#f5f7fb", text: "#1f2937" },
-  { bg: "#e9f5ff", text: "#1f2937" },
-  { bg: "#f4efe6", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", text: "#1f2937" },
-  { bg: "#1f2937", text: "#f3f4f6" },
-  { bg: "#0f172a", text: "#f1f5f9" },
-  { bg: "#1e1b4b", text: "#f3e8ff" },
-  { bg: "#0c0a1e", text: "#e9d5ff" },
-  { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", text: "#f0f9ff" },
-  { bg: "linear-gradient(120deg,#1f2937,#111827)", text: "#f9fafb" },
-  { bg: "linear-gradient(120deg,#1e293b,#0f172a)", text: "#f1f5f9" },
-  { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", text: "#fce7f3" },
-];
-
-function useTheme() {
-  const appBg = useUiThemeStore((s) => s.appBg);
-  const found = BG_THEMES.find(t => t.bg === appBg);
-  const textColor = found?.text || "#1f2937";
-  const isDark = DARK_TEXT_COLORS.includes(textColor);
-  return { appBg, textColor, isDark };
-}
 
 export default function InboxList() {
   const {

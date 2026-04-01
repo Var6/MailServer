@@ -6,6 +6,7 @@ import {
   PenSquare, Building2, UserCog, Receipt, Palette, Settings,
 } from "lucide-react";
 import { useAuthStore, useMailStore, useUiThemeStore } from "../../store/index.ts";
+import { BG_THEMES } from "../../lib/themes.ts";
 import { logout } from "../../api/authApi.ts";
 import { getFolders } from "../../api/mailApi.ts";
 import { avatarColor } from "../../lib/utils.ts";
@@ -47,24 +48,6 @@ const FALLBACK_FOLDERS: MailFolder[] = [
   { path: "Trash", name: "Trash", delimiter: "/", flags: [], subscribed: true },
 ];
 
-const BG_THEMES = [
-  { bg: "#eef2ff", label: "Light Purple", text: "#1f2937" },
-  { bg: "#f5f7fb", label: "Light Gray", text: "#1f2937" },
-  { bg: "#e9f5ff", label: "Light Blue", text: "#1f2937" },
-  { bg: "#f4efe6", label: "Light Tan", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#e0f2fe,#f5f3ff)", label: "Purple-Blue", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#fef3c7,#fde68a)", label: "Golden", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#dcfce7,#ccfbf1)", label: "Green-Teal", text: "#1f2937" },
-  { bg: "linear-gradient(120deg,#fee2e2,#fecdd3)", label: "Pink-Rose", text: "#1f2937" },
-  { bg: "#1f2937", label: "Dark Gray", text: "#f3f4f6" },
-  { bg: "#0f172a", label: "Dark Blue", text: "#f1f5f9" },
-  { bg: "#1e1b4b", label: "Dark Purple", text: "#f3e8ff" },
-  { bg: "#0c0a1e", label: "Very Dark", text: "#e9d5ff" },
-  { bg: "linear-gradient(120deg,#0f172a,#1e1b4b)", label: "Dark Purple-Blue", text: "#f0f9ff" },
-  { bg: "linear-gradient(120deg,#1f2937,#111827)", label: "Dark Gray Gradient", text: "#f9fafb" },
-  { bg: "linear-gradient(120deg,#1e293b,#0f172a)", label: "Slate-Blue", text: "#f1f5f9" },
-  { bg: "linear-gradient(120deg,#2d1b69,#0c0a1e)", label: "Deep Purple", text: "#fce7f3" },
-];
 
 function detectStandardFolder(folder: MailFolder): StandardKey | null {
   const special = (folder.specialUse ?? "").toLowerCase();
@@ -92,7 +75,7 @@ export default function Sidebar() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const currentTheme = typeof appBg === "string" ? BG_THEMES.find(t => t.bg === appBg) : undefined;
-  const textColor = currentTheme?.text || "#1f2937";
+  const textColor = currentTheme?.text ?? "#1f2937";
   const isDark = textColor === "#f3f4f6" || textColor === "#f1f5f9" || textColor === "#e9d5ff" || textColor === "#fce7f3" || textColor === "#f0f9ff" || textColor === "#f9fafb";
 
   // Close theme picker when clicking outside
