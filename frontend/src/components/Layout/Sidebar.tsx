@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Mail, Calendar, Users, Folder, LogOut, Inbox, Send,
   AlertTriangle, Trash2, FileText, ChevronDown, ChevronRight,
-  PenSquare, Building2, UserCog, Receipt, Palette, Settings,
+  PenSquare, Building2, UserCog, Receipt, Palette, Settings, BookOpen,
 } from "lucide-react";
 import { useAuthStore, useMailStore, useUiThemeStore } from "../../store/index.ts";
 import { BG_THEMES } from "../../lib/themes.ts";
@@ -15,7 +15,8 @@ import type { MailFolder } from "../../types/index.ts";
 import { folderToSlug, getDefaultMailRoute } from "../../lib/mailFolders.ts";
 
 const ADMIN_NAV = [
-  { to: "/admin/users", icon: UserCog, label: "Users" },
+  { to: "/admin/users", icon: UserCog,   label: "Users" },
+  { to: "/admin/guide", icon: BookOpen,  label: "Setup Guide" },
 ];
 
 const SUPERADMIN_NAV = [

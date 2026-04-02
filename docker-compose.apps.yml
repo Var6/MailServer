@@ -1,13 +1,20 @@
 version: "3.9"
 
 # ============================================================
-#  MailServer — Application Layer
-#  Files: D:\maildata\files\ via the Node.js API.
-#  Office editing: Collabora Online (collabora/code)
+#  MailServer — Application Layer  (local-storage edition)
+#  No Nextcloud, no Collabora — files served directly from
+#  D:\maildata\files\ via the Node.js API.
 # ============================================================
 
 networks:
   mailnet:
+    external: true
+    name: mail_mailnet
+
+volumes:
+  cert_data:
+    external: true
+    name: mail_cert_data
 
 services:
 
@@ -42,9 +49,6 @@ services:
       - D:/maildata/files:/data/files
     ports:
       - "127.0.0.1:3001:3000"
-    depends_on:
-      - mongodb
-      - redis
     networks:
       - mailnet
     healthcheck:
@@ -82,21 +86,6 @@ services:
     depends_on:
       - api
       - webmail
-    networks:
-      - mailnet
-
-  # ── Collabora Online (office editor) ─────────────────────
-  collabora:
-    image: collabora/code:latest
-    container_name: mailserver-collabora
-    restart: unless-stopped
-    cap_add:
-      - MKNOD
-    environment:
-      DONT_GEN_SSL_CERT: "YES"
-      extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:logging.level=warning --o:mount_jail_tree=false --o:security.capabilities=false"
-      # Allow our API as a WOPI host
-      aliasgroup1: "http://api:3000"
     networks:
       - mailnet
 

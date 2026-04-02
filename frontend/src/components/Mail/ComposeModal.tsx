@@ -16,7 +16,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import { useMailStore, useToastStore, useAuthStore } from "../../store/index.ts";
 import { useTheme } from "../../lib/themes.ts";
-import { sendMail } from "../../api/mailApi.ts";
+import { sendMail, getContactSuggestions } from "../../api/mailApi.ts";
 import { formatBytes, avatarColor } from "../../lib/utils.ts";
 
 
@@ -113,8 +113,7 @@ export default function ComposeModal() {
     progress: 0,
   });
   const [sendUploadProgress, setSendUploadProgress] = useState<number | null>(null);
-  const [toSuggestions, setToSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const knownRecipients = useRef(getKnownRecipients());
 
   const editor = useEditor({
@@ -169,25 +168,6 @@ export default function ComposeModal() {
     }, 30_000);
     return () => clearInterval(interval);
   }, [to, subject, editor, replyTo]);
-
-  const handleToChange = (value: string) => {
-    setTo(value);
-    const last = value.split(",").pop()?.trim() ?? "";
-    if (last.length >= 1) {
-      const matches = knownRecipients.current.filter(r => r.includes(last.toLowerCase()));
-      setToSuggestions(matches.slice(0, 6));
-      setShowSuggestions(matches.length > 0);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
-  const pickSuggestion = (email: string) => {
-    const parts = to.split(",");
-    parts[parts.length - 1] = " " + email;
-    setTo(parts.join(",").trimStart() + ", ");
-    setShowSuggestions(false);
-  };
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files) return;
@@ -330,60 +310,32 @@ export default function ComposeModal() {
           <span className="text-sm truncate" style={{ color: t.text }}>{authName ? `${authName} <${authEmail}>` : authEmail}</span>
         </div>
         {/* To field with autocomplete */}
-        <div className="relative">
-          <div className="flex items-center gap-0 px-4 border-b" style={{ borderColor: t.borderLight }}>
-            <span className="text-xs w-6 flex-shrink-0" style={{ color: t.muted }}>To</span>
-            <input
-              value={to}
-              onChange={e => handleToChange(e.target.value)}
-              onFocus={() => {
-                if (to.trim()) {
-                  const last = to.split(",").pop()?.trim() ?? "";
-                  const matches = knownRecipients.current.filter(r => r.includes(last.toLowerCase()));
-                  setToSuggestions(matches.slice(0, 6));
-                  setShowSuggestions(matches.length > 0);
-                }
-              }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="Recipients"
-              className="flex-1 outline-none text-sm py-2 bg-transparent"
-              style={{ color: t.text }}
-              autoFocus={!replyTo}
-            />
-            <div className="flex items-center gap-1 text-xs" style={{ color: t.muted }}>
-              {!showCc  && <button onClick={() => setShowCc(true)}  className="px-1 hover:opacity-80">Cc</button>}
-              {!showBcc && <button onClick={() => setShowBcc(true)} className="px-1 hover:opacity-80">Bcc</button>}
-            </div>
+        <div className="flex items-center gap-0 px-4 border-b" style={{ borderColor: t.borderLight }}>
+          <span className="text-xs w-6 flex-shrink-0" style={{ color: t.muted }}>To</span>
+          <RecipientInput
+            value={to} onChange={setTo} placeholder="Recipients"
+            t={t} localFallback={knownRecipients.current} autoFocus={!replyTo}
+          />
+          <div className="flex items-center gap-1 text-xs" style={{ color: t.muted }}>
+            {!showCc  && <button onClick={() => setShowCc(true)}  className="px-1 hover:opacity-80">Cc</button>}
+            {!showBcc && <button onClick={() => setShowBcc(true)} className="px-1 hover:opacity-80">Bcc</button>}
           </div>
-          {showSuggestions && toSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full rounded-lg shadow-lg z-20 py-1 max-h-40 overflow-y-auto border"
-              style={{ backgroundColor: t.bg, borderColor: t.border }}>
-              {toSuggestions.map(email => (
-                <button
-                  key={email}
-                  onMouseDown={() => pickSuggestion(email)}
-                  className="w-full text-left px-4 py-2 text-sm hover:opacity-80"
-                  style={{ color: t.text }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = t.hoverBg)}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-                >
-                  {email}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {showCc && (
           <FieldRow label="Cc" borderColor={t.borderLight} mutedColor={t.muted}>
-            <input value={cc} onChange={e => setCc(e.target.value)} placeholder="Cc recipients"
-              className="flex-1 outline-none text-sm py-2 bg-transparent" style={{ color: t.text }} />
+            <RecipientInput
+              value={cc} onChange={setCc} placeholder="Cc recipients"
+              t={t} localFallback={knownRecipients.current}
+            />
           </FieldRow>
         )}
         {showBcc && (
           <FieldRow label="Bcc" borderColor={t.borderLight} mutedColor={t.muted}>
-            <input value={bcc} onChange={e => setBcc(e.target.value)} placeholder="Bcc recipients"
-              className="flex-1 outline-none text-sm py-2 bg-transparent" style={{ color: t.text }} />
+            <RecipientInput
+              value={bcc} onChange={setBcc} placeholder="Bcc recipients"
+              t={t} localFallback={knownRecipients.current}
+            />
           </FieldRow>
         )}
         <FieldRow borderColor={t.borderLight} mutedColor={t.muted}>
@@ -414,12 +366,26 @@ export default function ComposeModal() {
         <ToolbarBtn title="Clear formatting"  active={false} onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()} isDark={isDark}><RemoveFormatting size={14} /></ToolbarBtn>
       </div>
 
-      {/* Body */}
+      {/* Body — drop zone */}
       <div
-        className={`flex-1 overflow-y-auto px-4 py-3 ${fullscreen ? "min-h-[400px]" : ""}`}
+        className={`flex-1 overflow-y-auto px-4 py-3 relative ${fullscreen ? "min-h-[400px]" : ""}`}
         style={{ color: t.text }}
         onClick={() => editor?.chain().focus().run()}
+        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
+        onDrop={e => {
+          e.preventDefault();
+          setIsDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
       >
+        {isDragOver && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded pointer-events-none"
+            style={{ backgroundColor: `${t.bg}e0`, border: `2px dashed #3b82f6` }}>
+            <Paperclip size={28} className="text-blue-500" />
+            <span className="text-sm font-medium text-blue-500">Drop files to attach</span>
+          </div>
+        )}
         <EditorContent editor={editor} />
       </div>
 
@@ -505,6 +471,81 @@ export default function ComposeModal() {
           <X size={16} />
         </button>
       </div>
+    </div>
+  );
+}
+
+type ThemeColors = { bg: string; text: string; muted: string; border: string; hoverBg: string; [k: string]: string };
+
+function RecipientInput({
+  value, onChange, placeholder, t, localFallback, autoFocus,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  t: ThemeColors;
+  localFallback: string[];
+  autoFocus?: boolean;
+}) {
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; address: string }>>([]);
+  const [show, setShow] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const query = (val: string) => {
+    const last = val.split(",").pop()?.trim() ?? "";
+    if (last.length < 1) { setShow(false); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await getContactSuggestions(last);
+        setSuggestions(results);
+        setShow(results.length > 0);
+      } catch {
+        const matches = localFallback.filter(r => r.includes(last.toLowerCase()));
+        setSuggestions(matches.map(a => ({ address: a, name: "" })));
+        setShow(matches.length > 0);
+      }
+    }, 200);
+  };
+
+  const pick = (addr: string) => {
+    const parts = value.split(",");
+    parts[parts.length - 1] = " " + addr;
+    onChange(parts.join(",").trimStart() + ", ");
+    setShow(false);
+  };
+
+  return (
+    <div className="relative flex-1">
+      <input
+        value={value}
+        onChange={e => { onChange(e.target.value); query(e.target.value); }}
+        onFocus={() => query(value)}
+        onBlur={() => setTimeout(() => setShow(false), 150)}
+        placeholder={placeholder}
+        className="w-full outline-none text-sm py-2 bg-transparent"
+        style={{ color: t.text }}
+        autoFocus={autoFocus}
+      />
+      {show && suggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full rounded-lg shadow-lg z-20 py-1 max-h-40 overflow-y-auto border"
+          style={{ backgroundColor: t.bg, borderColor: t.border }}>
+          {suggestions.map(s => (
+            <button
+              key={s.address}
+              onMouseDown={() => pick(s.address)}
+              className="w-full text-left px-4 py-2 text-sm"
+              style={{ color: t.text }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = t.hoverBg)}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              {s.name
+                ? <><span className="font-medium">{s.name}</span> <span style={{ color: t.muted }}>&lt;{s.address}&gt;</span></>
+                : s.address}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

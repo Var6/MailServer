@@ -1,5 +1,6 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
+import nodemailer from "nodemailer";
 import { config } from "../config/index.js";
 import type { MailFolder, MailHeader, MailMessage, PaginatedMessages } from "../types/index.js";
 
@@ -399,37 +400,120 @@ export async function importMailbox(
 export async function appendToSent(
   email: string,
   password: string,
-  opts: { from: string; to: string; subject: string; text?: string; html?: string }
+  opts: {
+    from: string; to: string; subject: string;
+    text?: string; html?: string;
+    attachments?: Array<{ filename: string; content: Buffer; contentType: string }>;
+  }
 ): Promise<void> {
-  const date = new Date().toUTCString();
-  const body = opts.text ?? (opts.html ? opts.html.replace(/<[^>]*>/g, "") : "");
-  const raw = [
-    `From: ${opts.from}`,
-    `To: ${opts.to}`,
-    `Subject: ${opts.subject}`,
-    `Date: ${date}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset=utf-8`,
-    ``,
-    body,
-  ].join("\r\n");
   try {
+    // Build a proper RFC 5322 message (with attachments if any) using nodemailer
+    const streamTransport = nodemailer.createTransport({ streamTransport: true, newline: "unix", buffer: true });
+    const info = await streamTransport.sendMail({
+      from: opts.from,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      html: opts.html,
+      attachments: opts.attachments?.map(a => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
+    });
+    const raw = info.message as Buffer;
+
     await withClient(email, password, async (client) => {
       const mailboxes = await client.list();
-      const sentBySpecial = mailboxes.find((m) => (m.specialUse ?? "").toLowerCase().includes("\\sent"));
-      const sentByName = mailboxes.find((m) => /(^|\b)(sent|sent items|sent mail)(\b|$)/i.test(`${m.name} ${m.path}`));
+      const sentBySpecial = mailboxes.find((m: { specialUse?: string; name: string; path: string }) => (m.specialUse ?? "").toLowerCase().includes("\\sent"));
+      const sentByName = mailboxes.find((m: { specialUse?: string; name: string; path: string }) => /(^|\b)(sent|sent items|sent mail)(\b|$)/i.test(`${m.name} ${m.path}`));
       const sentPath = sentBySpecial?.path ?? sentByName?.path ?? "Sent";
-
       try {
-        await client.append(sentPath, Buffer.from(raw), ["\\Seen"]);
+        await client.append(sentPath, raw, ["\\Seen"]);
       } catch {
         await client.mailboxCreate("Sent").catch(() => {});
-        await client.append("Sent", Buffer.from(raw), ["\\Seen"]);
+        await client.append("Sent", raw, ["\\Seen"]);
       }
     });
   } catch {
     // Non-fatal: don't fail the send if Sent append fails
   }
+}
+
+// ── Contact suggestion cache ─────────────────────────────────
+interface ContactEntry { name: string; address: string }
+const contactCache = new Map<string, { contacts: ContactEntry[]; builtAt: number }>();
+const CONTACT_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+export async function fetchContactSuggestions(
+  email: string,
+  password: string,
+  query: string
+): Promise<ContactEntry[]> {
+  const cached = contactCache.get(email);
+  if (!cached || Date.now() - cached.builtAt > CONTACT_CACHE_TTL) {
+    const contacts = await buildContactList(email, password);
+    contactCache.set(email, { contacts, builtAt: Date.now() });
+  }
+  const all = contactCache.get(email)!.contacts;
+  const q = query.toLowerCase().trim();
+  if (!q) return all.slice(0, 10);
+  return all
+    .filter(c => c.address.includes(q) || c.name.toLowerCase().includes(q))
+    .slice(0, 10);
+}
+
+async function buildContactList(email: string, password: string): Promise<ContactEntry[]> {
+  return withClient(email, password, async (client) => {
+    const seen = new Map<string, string>(); // address → name
+
+    const collect = (addrs: Array<{ name?: string; address?: string }> | undefined) => {
+      for (const a of addrs ?? []) {
+        if (!a.address?.includes("@")) continue;
+        const addr = a.address.toLowerCase();
+        if (!seen.has(addr)) seen.set(addr, a.name ?? "");
+      }
+    };
+
+    // INBOX — collect From addresses
+    try {
+      const lock = await client.getMailboxLock("INBOX");
+      try {
+        const status = await client.status("INBOX", { messages: true });
+        const total = status.messages ?? 0;
+        if (total > 0) {
+          const start = Math.max(1, total - 199);
+          for await (const msg of client.fetch(`${start}:${total}`, { envelope: true })) {
+            collect(msg.envelope?.from as Array<{ name?: string; address?: string }>);
+          }
+        }
+      } finally { lock.release(); }
+    } catch { /* skip */ }
+
+    // Sent folder — collect To + Cc addresses
+    try {
+      const mailboxes = await client.list();
+      const sentFolder =
+        mailboxes.find(m => (m.specialUse ?? "").toLowerCase().includes("\\sent")) ??
+        mailboxes.find(m => /(^|\/)sent/i.test(m.path));
+      if (sentFolder) {
+        const lock = await client.getMailboxLock(sentFolder.path);
+        try {
+          const status = await client.status(sentFolder.path, { messages: true });
+          const total = status.messages ?? 0;
+          if (total > 0) {
+            const start = Math.max(1, total - 199);
+            for await (const msg of client.fetch(`${start}:${total}`, { envelope: true })) {
+              collect(msg.envelope?.to as Array<{ name?: string; address?: string }>);
+              collect(msg.envelope?.cc as Array<{ name?: string; address?: string }>);
+            }
+          }
+        } finally { lock.release(); }
+      }
+    } catch { /* skip */ }
+
+    return Array.from(seen.entries()).map(([address, name]) => ({ address, name }));
+  });
 }
 
 function hasAttachment(body: unknown): boolean {

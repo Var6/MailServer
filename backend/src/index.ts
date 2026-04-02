@@ -26,7 +26,6 @@ import billingRouter  from "./routes/billing.js";
 import setupRouter        from "./routes/setup.js";
 import settingsRouter     from "./routes/settings.js";
 import inboundWebhookRouter from "./routes/inboundWebhook.js";
-import wopiRouter           from "./routes/wopi.js";
 import { startPostfixTcpMap } from "./services/postfixTcpMap.js";
 
 const app = express();
@@ -67,7 +66,6 @@ app.use("/admin",     adminRouter);      // Admin: manage own company users
 app.use("/billing",   billingRouter);   // Superadmin: billing management
 app.use("/setup",     setupRouter);     // First-run: create superadmin (no-op after)
 app.use("/settings",  settingsRouter);  // User profile & password
-app.use("/wopi",      express.raw({ type: "*/*", limit: "100mb" }), wopiRouter); // Collabora WOPI
 
 // ── Error handler ─────────────────────────────────────────
 app.use(errorHandler);

@@ -32,6 +32,15 @@ export const sendMail = (payload: {
 }, onUploadProgress?: (event: AxiosProgressEvent) => void) =>
   apiClient.post("/mail/send", payload, { onUploadProgress }).then(r => r.data);
 
+export const saveAttachmentToFiles = (uid: number, folder: string, index: number) =>
+  apiClient.post<{ ok: true; path: string }>(
+    `/mail/messages/${uid}/attachments/${index}/save-to-files`,
+    { folder }
+  ).then(r => r.data);
+
+export const getContactSuggestions = (q: string) =>
+  apiClient.get<Array<{ name: string; address: string }>>("/mail/contacts/suggestions", { params: { q } }).then(r => r.data);
+
 export const moveMessage = (uid: number, folder: string, destination: string) =>
   apiClient.post(`/mail/messages/${uid}/move`, { folder, destination }).then(r => r.data);
 

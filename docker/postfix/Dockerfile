@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       gettext-base \
       ca-certificates \
       curl \
+      telnet \
+      netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Create vmail user/group (uid/gid 5000 matches Dovecot)

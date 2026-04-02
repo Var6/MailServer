@@ -34,6 +34,11 @@ const envSchema = z.object({
   NEXTCLOUD_ADMIN_USER:       z.string().default("admin"),
   NEXTCLOUD_ADMIN_PASSWORD:   z.string().default("changeme"),
 
+  // File storage
+  FILE_STORAGE_DRIVER:        z.enum(["local", "nextcloud"]).default("local"),
+  LOCAL_FILES_ROOT:           z.string().default("./data/local-files"),
+  LOCAL_FILES_HOST_PATH:      z.string().optional(),
+
   // Domain
   MAIL_DOMAIN:           z.string().default("yourdomain.com"),
 

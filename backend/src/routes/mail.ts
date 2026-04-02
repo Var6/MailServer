@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import * as imap from "../services/imapService.js";
 import { sendMail } from "../services/smtpService.js";
 import { provisionUser, uploadFile } from "../services/nextcloudService.js";
+import { uploadLocalFile } from "../services/localFileService.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -106,6 +107,34 @@ router.post("/messages/:uid/attachments/:index/edit-online", async (req, res, ne
   } catch (e) { next(e); }
 });
 
+// GET /mail/contacts/suggestions?q=
+router.get("/contacts/suggestions", async (req, res, next) => {
+  try {
+    const q = (req.query.q as string) ?? "";
+    const suggestions = await imap.fetchContactSuggestions(req.user!.sub, req.userPassword!, q);
+    res.json(suggestions);
+  } catch (e) { next(e); }
+});
+
+// POST /mail/messages/:uid/attachments/:index/save-to-files
+router.post("/messages/:uid/attachments/:index/save-to-files", async (req, res, next) => {
+  try {
+    const uid = parseInt(req.params.uid, 10);
+    const index = parseInt(req.params.index, 10);
+    const folder = ((req.body as { folder?: string })?.folder as string) || "INBOX";
+    if (Number.isNaN(uid) || Number.isNaN(index) || index < 0) {
+      res.status(400).json({ error: "Invalid uid or attachment index" }); return;
+    }
+    const attachment = await imap.fetchAttachment(req.user!.sub, req.userPassword!, folder, uid, index);
+    if (!attachment) { res.status(404).json({ error: "Attachment not found" }); return; }
+
+    const safeFilename = attachment.filename.replace(/[\\/:*?"<>|]/g, "_");
+    const filePath = `/Mail Attachments/${safeFilename}`;
+    await uploadLocalFile(req.user!.sub, filePath, attachment.content);
+    res.json({ ok: true, path: filePath });
+  } catch (e) { next(e); }
+});
+
 // POST /mail/send
 const sendSchema = z.object({
   to: z.union([z.string(), z.array(z.string())]),
@@ -134,7 +163,7 @@ router.post("/send", async (req, res, next) => {
     }));
     await sendMail({ ...opts, from, attachments }, password);
     const toStr = Array.isArray(opts.to) ? opts.to.join(", ") : opts.to;
-    imap.appendToSent(from, password, { from, to: toStr, subject: opts.subject, text: opts.text, html: opts.html }).catch(() => {});
+    imap.appendToSent(from, password, { from, to: toStr, subject: opts.subject, text: opts.text, html: opts.html, attachments }).catch(() => {});
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
