@@ -29,15 +29,9 @@ function Navbar() {
         <div className="flex items-center gap-2">
           <Link
             to="/login"
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
           >
-            User Portal
-          </Link>
-          <Link
-            to="/admin/login"
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
-          >
-            Admin Portal
+            Sign In
           </Link>
         </div>
       </div>
@@ -63,7 +57,7 @@ const portalCards = [
     icon: Building2,
     description:
       "Create and manage users within your company, reset passwords, and configure quotas.",
-    href: "/admin/login",
+    href: "/login",
     gradient: "from-indigo-500 to-indigo-700",
     ring: "ring-indigo-200",
     btnBg: "bg-indigo-600 hover:bg-indigo-700",
@@ -404,13 +398,7 @@ function CTABanner() {
             to="/login"
             className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-blue-700 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
           >
-            Sign In as User <ArrowRight size={16} />
-          </Link>
-          <Link
-            to="/admin/login"
-            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white/10 border border-white/30 text-white font-semibold rounded-xl hover:bg-white/20 transition-all"
-          >
-            Admin Portal <ArrowRight size={16} />
+            Sign In <ArrowRight size={16} />
           </Link>
         </div>
       </div>
@@ -435,8 +423,7 @@ function Footer() {
         </p>
 
         <div className="flex items-center gap-4 text-gray-500 text-sm">
-          <Link to="/login" className="hover:text-white transition-colors">User Portal</Link>
-          <Link to="/admin/login" className="hover:text-white transition-colors">Admin Portal</Link>
+          <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
         </div>
       </div>
     </footer>

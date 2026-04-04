@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>MailServer — Developer Handover</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a202c; background: #fff; line-height: 1.6; }
+
+  .cover { background: linear-gradient(135deg, #1e40af 0%, #4338ca 100%); color: white; padding: 60px 50px; min-height: 250px; }
+  .cover h1 { font-size: 36px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+  .cover .sub { font-size: 16px; opacity: 0.85; margin-bottom: 24px; }
+  .cover .meta { display: flex; gap: 32px; margin-top: 24px; }
+  .cover .meta span { font-size: 12px; opacity: 0.7; }
+  .cover .meta strong { font-size: 13px; opacity: 0.95; display: block; }
+
+  .toc { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 24px 50px; }
+  .toc h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 12px; }
+  .toc ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 24px; padding-left: 20px; }
+  .toc li { font-size: 12px; color: #2563eb; }
+
+  main { padding: 0 50px 50px; }
+
+  section { margin-top: 40px; page-break-inside: avoid; }
+  h2.sec { font-size: 20px; font-weight: 700; color: #1e40af; border-bottom: 2px solid #bfdbfe; padding-bottom: 6px; margin-bottom: 16px; }
+  h3 { font-size: 14px; font-weight: 700; color: #1e293b; margin: 18px 0 8px; }
+  h4 { font-size: 12px; font-weight: 700; color: #475569; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  p { margin-bottom: 8px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge-blue { background: #dbeafe; color: #1d4ed8; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-orange { background: #ffedd5; color: #c2410c; }
+  .badge-purple { background: #ede9fe; color: #6d28d9; }
+  .badge-red { background: #fee2e2; color: #b91c1c; }
+
+  code { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 1px 6px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; color: #be185d; }
+
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 18px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; overflow-x: auto; margin: 10px 0; line-height: 1.7; }
+  pre .comment { color: #64748b; }
+  pre .kw { color: #93c5fd; }
+  pre .str { color: #86efac; }
+  pre .val { color: #fbbf24; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+  th { background: #1e40af; color: white; text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 12px 0; }
+  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; }
+  .card h4 { margin: 0 0 8px; color: #1e40af; text-transform: none; font-size: 13px; letter-spacing: 0; }
+  .card p { font-size: 12px; color: #475569; margin: 0; }
+
+  ul, ol { padding-left: 20px; margin: 8px 0; }
+  li { margin: 3px 0; }
+
+  .warn { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 12px; }
+  .info { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 12px; }
+  .success { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 12px; }
+
+  .file-tree { font-family: 'Consolas', monospace; font-size: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; line-height: 2; }
+  .ft-dir { color: #1d4ed8; font-weight: 600; }
+  .ft-file { color: #374151; }
+  .ft-note { color: #6b7280; font-size: 11px; }
+
+  .step { display: flex; gap: 12px; align-items: flex-start; margin: 10px 0; }
+  .step-num { background: #1e40af; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+  @media print {
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    pre { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    section { page-break-inside: avoid; }
+  }
+
+  hr.page { border: none; page-break-after: always; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>MailServer</h1>
+  <div class="sub">Self-hosted Email, Calendar, Contacts &amp; Files Platform</div>
+  <div class="meta">
+    <div><span>Document Type</span><strong>Developer Handover &amp; Operations Guide</strong></div>
+    <div><span>Date</span><strong>April 2026</strong></div>
+    <div><span>Stack</span><strong>React · Node.js · Docker · MongoDB</strong></div>
+    <div><span>Platform</span><strong>Windows 11 / Raspberry Pi 4</strong></div>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li>Project Overview</li>
+    <li>Architecture Diagram</li>
+    <li>Directory Structure</li>
+    <li>Prerequisites &amp; Setup</li>
+    <li>Running in Development</li>
+    <li>Running in Production (Docker)</li>
+    <li>Environment Variables</li>
+    <li>Frontend Guide</li>
+    <li>Backend Guide</li>
+    <li>Database Guide</li>
+    <li>Docker Reference</li>
+    <li>Making &amp; Deploying Changes</li>
+    <li>User Roles &amp; Login</li>
+    <li>File Storage</li>
+    <li>Office Editing (WOPI)</li>
+    <li>Common Errors &amp; Fixes</li>
+    <li>Key Files Quick Reference</li>
+    <li>Checklist for New Developer</li>
+  </ol>
+</div>
+
+<main>
+
+<!-- 1. OVERVIEW -->
+<section>
+  <h2 class="sec">1. Project Overview</h2>
+  <p>MailServer is a <strong>fully self-hosted productivity suite</strong> — a drop-in alternative to Gmail / G Suite that runs entirely on your own hardware. It provides webmail, shared calendar, contacts, file storage, and in-browser office document editing.</p>
+
+  <div class="grid3" style="margin-top:14px">
+    <div class="card">
+      <h4>📧 Webmail</h4>
+      <p>Gmail-style 3-pane inbox. Compose, reply, folders, search. Powered by Dovecot (IMAP) + Postfix (SMTP).</p>
+    </div>
+    <div class="card">
+      <h4>📅 Calendar</h4>
+      <p>CalDAV sync. Shared team events. FullCalendar UI with drag-and-drop.</p>
+    </div>
+    <div class="card">
+      <h4>👥 Contacts</h4>
+      <p>CardDAV-based contact management. Syncs with phone / Outlook / Thunderbird.</p>
+    </div>
+    <div class="card">
+      <h4>📁 Files</h4>
+      <p>Upload, browse, share files &amp; folders (Google Drive style). Stored in <code>D:\maildata\files\</code>.</p>
+    </div>
+    <div class="card">
+      <h4>📝 Office Editing</h4>
+      <p>Edit .docx / .xlsx / .pptx in-browser via Collabora CODE (WOPI protocol). No desktop app needed.</p>
+    </div>
+    <div class="card">
+      <h4>🔒 Multi-tenant</h4>
+      <p>Superadmin creates company tenants. Each company admin manages their own users.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2. ARCHITECTURE -->
+<section>
+  <h2 class="sec">2. Architecture Diagram</h2>
+  <pre>
+  Browser
+     │  port 80 (Docker) or 5173 (dev)
+     ▼
+┌────────────────────────────────────────────────────────┐
+│  Nginx  (reverse proxy)  — port 8080/8443              │
+│  Routes:  /api/*  →  api:3000                          │
+│           /*      →  webmail:80 (React SPA)            │
+└────────────────┬───────────────────────────────────────┘
+                 │ Docker network: mailnet
+     ┌───────────┴────────────┐
+     ▼                        ▼
+┌──────────┐          ┌───────────────┐
+│  webmail │          │  api (Node.js) │
+│  :80     │          │  :3000         │
+│  (nginx  │          │  Express +     │
+│   serve  │          │  JWT auth      │
+│   React  │          └───────┬───────┘
+│   build) │                  │
+└──────────┘        ┌─────────┼─────────┐
+                    ▼         ▼         ▼
+              ┌──────────┐ ┌──────┐ ┌──────────┐
+              │ MongoDB  │ │Redis │ │Dovecot   │
+              │ :27017   │ │:6379 │ │IMAP:993  │
+              └──────────┘ └──────┘ └──────────┘
+                                    ┌──────────┐
+                                    │ Postfix  │
+                                    │ SMTP:587 │
+                                    └──────────┘
+                                    ┌──────────┐
+                                    │Collabora │
+                                    │ :9980    │
+                                    └──────────┘
+  Files stored at: D:\maildata\files\  (Windows host)
+  Mounted inside api container at: /data/files
+  </pre>
+  <div class="info">In <strong>development</strong>, you bypass Docker and run the backend on <code>localhost:3000</code> and Vite dev server on <code>localhost:5173</code>. In <strong>production</strong>, everything runs in Docker containers.</div>
+</section>
+
+<!-- 3. DIRECTORY STRUCTURE -->
+<section>
+  <h2 class="sec">3. Directory Structure</h2>
+  <div class="file-tree">
+    <div><span class="ft-dir">d:\Language prop\Mail\</span> &nbsp; <span class="ft-note">← project root</span></div>
+    <div>&nbsp; ├── <span class="ft-dir">backend/</span> &nbsp; <span class="ft-note">Node.js Express REST API</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">src/</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-file">index.ts</span> &nbsp; <span class="ft-note">Entry point, Express app setup</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">config/</span> &nbsp; <span class="ft-note">index.ts — all env vars via Zod schema</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">routes/</span> &nbsp; <span class="ft-note">auth, mail, files, calendar, contacts, wopi…</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">models/</span> &nbsp; <span class="ft-note">Mongoose: User, Tenant, Share, Bill…</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">middleware/</span> &nbsp; <span class="ft-note">auth.ts (JWT verify), errorHandler.ts</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="ft-dir">services/</span> &nbsp; <span class="ft-note">imap, smtp, localFile, nextcloud</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; ├── <span class="ft-file">.env</span> &nbsp; <span class="ft-note">⚠ dev overrides (never commit secrets)</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; ├── <span class="ft-file">Dockerfile</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; └── <span class="ft-file">package.json</span></div>
+    <div>&nbsp; ├── <span class="ft-dir">frontend/</span> &nbsp; <span class="ft-note">React 18 + Vite + Tailwind</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">src/</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-file">App.tsx</span> &nbsp; <span class="ft-note">Route definitions</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">pages/</span> &nbsp; <span class="ft-note">Login, Inbox, Calendar, Files, Contacts, Settings…</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">components/</span> &nbsp; <span class="ft-note">Layout (Sidebar, Header, AppNavbar), Mail, ui</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">api/</span> &nbsp; <span class="ft-note">client.ts (axios + token refresh), mailApi, authApi…</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="ft-dir">store/</span> &nbsp; <span class="ft-note">Zustand: useAuthStore, useMailStore, useUiThemeStore</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="ft-dir">lib/</span> &nbsp; <span class="ft-note">themes.ts, utils.ts, mailFolders.ts</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; ├── <span class="ft-file">Dockerfile</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; ├── <span class="ft-file">nginx.conf</span> &nbsp; <span class="ft-note">Serves React build inside container</span></div>
+    <div>&nbsp; │&nbsp;&nbsp; └── <span class="ft-file">vite.config.ts</span></div>
+    <div>&nbsp; ├── <span class="ft-dir">config/</span> &nbsp; <span class="ft-note">nginx, dovecot, postfix, rspamd, mongodb configs</span></div>
+    <div>&nbsp; ├── <span class="ft-dir">docker/</span> &nbsp; <span class="ft-note">Custom Dockerfiles for Dovecot, Postfix</span></div>
+    <div>&nbsp; ├── <span class="ft-file">docker-compose.yml</span> &nbsp; <span class="ft-note">Core services: Dovecot, Postfix, MongoDB, Redis…</span></div>
+    <div>&nbsp; ├── <span class="ft-file">docker-compose.apps.yml</span> &nbsp; <span class="ft-note">App layer: api, webmail, nginx, cloudflared</span></div>
+    <div>&nbsp; ├── <span class="ft-file">dev.sh</span> &nbsp; <span class="ft-note">Start dev servers (bash dev.sh)</span></div>
+    <div>&nbsp; ├── <span class="ft-file">.env</span> &nbsp; <span class="ft-note">Root secrets used by docker-compose</span></div>
+    <div>&nbsp; └── <span class="ft-dir">D:\maildata\files\</span> &nbsp; <span class="ft-note">User files (separate drive, mounted into api container)</span></div>
+  </div>
+</section>
+
+<hr class="page">
+
+<!-- 4. PREREQUISITES -->
+<section>
+  <h2 class="sec">4. Prerequisites &amp; Initial Setup</h2>
+
+  <h3>Required Software</h3>
+  <table>
+    <tr><th>Tool</th><th>Version</th><th>Purpose</th></tr>
+    <tr><td><strong>Node.js</strong></td><td>v20 LTS</td><td>Run backend and frontend build tools</td></tr>
+    <tr><td><strong>Docker Desktop</strong></td><td>Latest</td><td>Run all services in containers</td></tr>
+    <tr><td><strong>Git</strong></td><td>Any</td><td>Version control</td></tr>
+    <tr><td><strong>VS Code</strong></td><td>Recommended</td><td>Development IDE (has Claude Code extension)</td></tr>
+  </table>
+
+  <h3>First-Time Setup</h3>
+  <div class="step"><div class="step-num">1</div><div><strong>Clone or access the project:</strong><br><code>cd "d:\Language prop\Mail"</code></div></div>
+  <div class="step"><div class="step-num">2</div><div><strong>Install backend dependencies:</strong><pre>cd backend && npm install && cd ..</pre></div></div>
+  <div class="step"><div class="step-num">3</div><div><strong>Install frontend dependencies:</strong><pre>cd frontend && npm install && cd ..</pre></div></div>
+  <div class="step"><div class="step-num">4</div><div><strong>Ensure <code>D:\maildata\files\</code> directory exists</strong> — this is where all user files are stored.</div></div>
+  <div class="step"><div class="step-num">5</div><div><strong>Check <code>.env</code> files</strong> — root <code>.env</code> (Docker secrets) and <code>backend/.env</code> (dev overrides) must exist.</div></div>
+  <div class="step"><div class="step-num">6</div><div><strong>Start the Docker network first:</strong><pre>docker compose -f docker-compose.yml up -d</pre></div></div>
+</section>
+
+<!-- 5. DEV MODE -->
+<section>
+  <h2 class="sec">5. Running in Development Mode</h2>
+  <div class="info">Development mode runs the backend and frontend directly on your machine (no Docker for app code). The core services (MongoDB, Redis, Dovecot, Postfix) still run in Docker.</div>
+
+  <h3>Quick Start</h3>
+  <pre><span class="comment"># From project root in Git Bash / WSL</span>
+bash dev.sh
+
+<span class="comment"># First time (installs npm packages too):</span>
+bash dev.sh --install</pre>
+
+  <p>This starts:</p>
+  <ul>
+    <li>Backend API on <code>http://localhost:3000</code></li>
+    <li>Frontend Vite dev server on <code>http://localhost:5173</code></li>
+  </ul>
+
+  <div class="warn">⚠️ Always access the app on <strong>port 5173</strong> during development, NOT port 80. Port 80 is the Docker container serving the old production build.</div>
+
+  <h3>Starting Services Individually</h3>
+  <pre><span class="comment"># Backend only</span>
+cd backend
+npm run dev          <span class="comment"># tsx watch --env-file=.env src/index.ts</span>
+
+<span class="comment"># Frontend only</span>
+cd frontend
+npm run dev          <span class="comment"># vite --host 0.0.0.0</span></pre>
+
+  <h3>Dev Login URLs</h3>
+  <table>
+    <tr><th>Role</th><th>URL</th></tr>
+    <tr><td>All users (user / admin / superadmin)</td><td><code>http://localhost:5173/login</code></td></tr>
+    <tr><td>Landing page</td><td><code>http://localhost:5173/</code></td></tr>
+    <tr><td>API health check</td><td><code>http://localhost:3000/health</code></td></tr>
+  </table>
+</section>
+
+<!-- 6. PRODUCTION -->
+<section>
+  <h2 class="sec">6. Running in Production (Docker)</h2>
+
+  <h3>Full Stack Start (First Time)</h3>
+  <pre><span class="comment"># Step 1: Start core mail services</span>
+docker compose -f docker-compose.yml up -d
+
+<span class="comment"># Step 2: Build and start app layer</span>
+docker compose -f docker-compose.apps.yml up -d --build</pre>
+
+  <h3>After Making Code Changes (Most Common)</h3>
+  <pre><span class="comment"># Rebuild only changed containers</span>
+docker compose -f docker-compose.apps.yml build webmail api
+
+<span class="comment"># Restart them</span>
+docker compose -f docker-compose.apps.yml up -d webmail api</pre>
+
+  <div class="warn">⚠️ Every time you change frontend or backend source code, you MUST rebuild the relevant Docker image and restart the container. Changes to <code>frontend/src/</code> require rebuilding <code>webmail</code>. Changes to <code>backend/src/</code> require rebuilding <code>api</code>.</div>
+
+  <h3>Check Status</h3>
+  <pre>docker compose -f docker-compose.apps.yml ps
+docker logs mailserver-api --tail=50
+docker logs mailserver-webmail --tail=20</pre>
+
+  <h3>Stop Everything</h3>
+  <pre>docker compose -f docker-compose.apps.yml down
+docker compose -f docker-compose.yml down</pre>
+
+  <h3>Access in Production</h3>
+  <table>
+    <tr><th>What</th><th>URL</th></tr>
+    <tr><td>Web app (via nginx)</td><td><code>http://&lt;server-ip&gt;:8080</code></td></tr>
+    <tr><td>API direct (local only)</td><td><code>http://127.0.0.1:3001</code></td></tr>
+    <tr><td>HTTPS (Cloudflare Tunnel)</td><td>Your configured domain</td></tr>
+  </table>
+</section>
+
+<hr class="page">
+
+<!-- 7. ENV VARS -->
+<section>
+  <h2 class="sec">7. Environment Variables</h2>
+
+  <h3>Root <code>.env</code> — Docker Compose Secrets</h3>
+  <table>
+    <tr><th>Variable</th><th>Example</th><th>Purpose</th></tr>
+    <tr><td><code>JWT_SECRET</code></td><td>long-random-string-min-32chars</td><td>Access token signing</td></tr>
+    <tr><td><code>JWT_REFRESH_SECRET</code></td><td>another-long-random-string</td><td>Refresh token signing</td></tr>
+    <tr><td><code>MONGO_URI</code></td><td>mongodb://mailserver:pass@mongodb:27017/mailserver?authSource=mailserver</td><td>MongoDB connection</td></tr>
+    <tr><td><code>REDIS_PASSWORD</code></td><td>redis-secret</td><td>Redis auth</td></tr>
+    <tr><td><code>MAIL_DOMAIN</code></td><td>yourdomain.com</td><td>Email domain</td></tr>
+    <tr><td><code>INTERNAL_AUTH_TOKEN</code></td><td>secret-token</td><td>Dovecot → API auth</td></tr>
+    <tr><td><code>CLOUDFLARE_TUNNEL_TOKEN</code></td><td>eyJh…</td><td>Cloudflare public HTTPS tunnel</td></tr>
+  </table>
+
+  <h3><code>backend/.env</code> — Dev Overrides</h3>
+  <pre><span class="comment"># Connect to local MongoDB (no auth in dev)</span>
+MONGO_URI=mongodb://localhost:27017/mailserver
+JWT_SECRET=dev-secret-key-at-least-32-characters
+JWT_REFRESH_SECRET=dev-refresh-secret-at-least-32-chars
+MAIL_DOMAIN=yourdomain.com
+INTERNAL_AUTH_TOKEN=dev-internal-token
+<span class="comment"># File storage in dev</span>
+FILE_STORAGE_DRIVER=local
+LOCAL_FILES_ROOT=D:/maildata/files
+<span class="comment"># Collabora / WOPI in dev</span>
+COLLABORA_URL=http://localhost:8082
+WOPI_HOST=http://host.docker.internal:3000</pre>
+</section>
+
+<!-- 8. FRONTEND GUIDE -->
+<section>
+  <h2 class="sec">8. Frontend Guide</h2>
+  <p>The frontend is a <strong>React 18</strong> single-page application built with <strong>Vite</strong> and styled with <strong>Tailwind CSS</strong>.</p>
+
+  <h3>Key Libraries</h3>
+  <table>
+    <tr><th>Library</th><th>Purpose</th></tr>
+    <tr><td>React Router v6</td><td>Client-side routing</td></tr>
+    <tr><td>TanStack Query (React Query)</td><td>Server state management, caching, background refetch</td></tr>
+    <tr><td>Zustand</td><td>Client state: auth, mail selection, UI theme</td></tr>
+    <tr><td>Axios</td><td>HTTP client with JWT interceptor &amp; token refresh</td></tr>
+    <tr><td>Tiptap</td><td>Rich text email editor</td></tr>
+    <tr><td>FullCalendar</td><td>Calendar UI</td></tr>
+    <tr><td>Lucide React</td><td>Icons</td></tr>
+    <tr><td>Tailwind CSS</td><td>Utility-first CSS</td></tr>
+  </table>
+
+  <h3>State Management (Zustand Stores)</h3>
+  <table>
+    <tr><th>Store</th><th>File</th><th>Contains</th></tr>
+    <tr><td><code>useAuthStore</code></td><td><code>store/index.ts</code></td><td>accessToken, refreshToken, email, role, avatar, displayName</td></tr>
+    <tr><td><code>useMailStore</code></td><td><code>store/index.ts</code></td><td>selectedFolder, searchQuery, composeOpen</td></tr>
+    <tr><td><code>useUiThemeStore</code></td><td><code>store/index.ts</code></td><td>appBg (background theme colour)</td></tr>
+  </table>
+
+  <h3>Route Structure (<code>App.tsx</code>)</h3>
+  <pre><span class="comment">// Public routes — no auth needed</span>
+/                    → LandingPage
+/login               → Login (universal for all roles)
+/admin/login         → Login (same component)
+/superadmin/login    → Login (same component)
+
+<span class="comment">// Protected routes — wrapped in RequireAuth → Layout</span>
+/mail/:folder        → Inbox (IMAP)
+/calendar            → Calendar (CalDAV)
+/contacts            → Contacts (CardDAV)
+/files               → Files (local storage)
+/settings            → Settings
+
+<span class="comment">// Admin only</span>
+/admin/users         → User management
+/admin/guide         → Setup guide
+
+<span class="comment">// Superadmin only</span>
+/superadmin/tenants  → Tenant management
+/superadmin/billing  → Billing</pre>
+
+  <h3>Adding a New Page</h3>
+  <ol>
+    <li>Create <code>frontend/src/pages/MyPage.tsx</code></li>
+    <li>Import it in <code>App.tsx</code></li>
+    <li>Add a <code>&lt;Route&gt;</code> inside the protected <code>&lt;Layout&gt;</code> route</li>
+    <li>Add a nav link in <code>components/Layout/AppNavbar.tsx</code> and/or <code>Sidebar.tsx</code></li>
+  </ol>
+
+  <h3>Tailwind &amp; Dynamic Colors</h3>
+  <div class="warn">⚠️ Tailwind JIT purges unused classes at build time. If you construct class names dynamically (e.g. <code>`bg-${color}-500`</code>), Tailwind won't include them. Always use <strong>inline styles</strong> for dynamic colors: <code>style={{ backgroundColor: color }}</code> where <code>color</code> is a hex string.</div>
+
+  <h3>Adding a New API Call</h3>
+  <ol>
+    <li>Add function to the relevant <code>frontend/src/api/xxxApi.ts</code> file</li>
+    <li>Use with <code>useQuery</code> (read) or <code>useMutation</code> (write) from TanStack Query</li>
+    <li>The axios client in <code>api/client.ts</code> handles JWT tokens and auto-refresh automatically</li>
+  </ol>
+</section>
+
+<hr class="page">
+
+<!-- 9. BACKEND GUIDE -->
+<section>
+  <h2 class="sec">9. Backend Guide</h2>
+  <p>The backend is a <strong>Node.js Express</strong> REST API written in <strong>TypeScript</strong>, compiled with <code>tsx</code> in development and <code>tsc</code> for production Docker builds.</p>
+
+  <h3>API Route Map</h3>
+  <table>
+    <tr><th>Prefix</th><th>File</th><th>What it does</th></tr>
+    <tr><td><code>POST /auth/login</code></td><td>routes/auth.ts</td><td>Login, returns JWT access + refresh tokens</td></tr>
+    <tr><td><code>POST /auth/refresh</code></td><td>routes/auth.ts</td><td>Refresh access token using refresh cookie</td></tr>
+    <tr><td><code>GET /mail/messages</code></td><td>routes/mail.ts</td><td>List emails in a folder via IMAP</td></tr>
+    <tr><td><code>POST /mail/send</code></td><td>routes/mail.ts</td><td>Send email via SMTP</td></tr>
+    <tr><td><code>GET /files/list</code></td><td>routes/files.ts</td><td>Browse user files</td></tr>
+    <tr><td><code>POST /files/upload</code></td><td>routes/files.ts</td><td>Upload a file</td></tr>
+    <tr><td><code>POST /files/share</code></td><td>routes/files.ts</td><td>Share file/folder with another user</td></tr>
+    <tr><td><code>GET /files/shared-with-me</code></td><td>routes/files.ts</td><td>List files shared to current user</td></tr>
+    <tr><td><code>GET /calendar/events</code></td><td>routes/calendar.ts</td><td>Fetch CalDAV events</td></tr>
+    <tr><td><code>GET /contacts</code></td><td>routes/contacts.ts</td><td>Fetch CardDAV contacts</td></tr>
+    <tr><td><code>GET /settings/profile</code></td><td>routes/settings.ts</td><td>Get user profile (name, avatar)</td></tr>
+    <tr><td><code>POST /wopi/token</code></td><td>routes/wopi.ts</td><td>Get WOPI token for Collabora office editing</td></tr>
+    <tr><td><code>GET /admin/users</code></td><td>routes/adminPanel.ts</td><td>List users (admin only)</td></tr>
+    <tr><td><code>GET /superadmin/tenants</code></td><td>routes/tenants.ts</td><td>List tenants (superadmin only)</td></tr>
+  </table>
+
+  <h3>Authentication Flow</h3>
+  <ol>
+    <li>Client sends <code>POST /auth/login</code> with email + password</li>
+    <li>Backend verifies against Dovecot (IMAP login attempt) or MongoDB for admin/superadmin</li>
+    <li>Returns short-lived access token (15 min) in response + long-lived refresh token in httpOnly cookie</li>
+    <li>Client stores access token in Zustand (memory only — not localStorage)</li>
+    <li>On 401, the axios interceptor in <code>api/client.ts</code> auto-calls <code>POST /auth/refresh</code></li>
+  </ol>
+
+  <h3>Adding a New API Route</h3>
+  <ol>
+    <li>Create <code>backend/src/routes/myRoute.ts</code></li>
+    <li>Import and register in <code>backend/src/index.ts</code>: <code>app.use('/my-route', myRouter)</code></li>
+    <li>Protect with JWT middleware: <code>router.use(requireAuth)</code> from <code>middleware/auth.ts</code></li>
+    <li>Add Zod schema validation for request body</li>
+  </ol>
+
+  <h3>MongoDB Models</h3>
+  <table>
+    <tr><th>Model</th><th>File</th><th>Purpose</th></tr>
+    <tr><td>User</td><td>models/User.ts</td><td>User accounts (admin/superadmin — mail users are in Dovecot)</td></tr>
+    <tr><td>Tenant</td><td>models/Tenant.ts</td><td>Company tenants (superadmin managed)</td></tr>
+    <tr><td>Share</td><td>models/Share.ts</td><td>File sharing records (ownerEmail, path, sharedWith, permission)</td></tr>
+    <tr><td>Bill</td><td>models/Bill.ts</td><td>Billing records per tenant</td></tr>
+    <tr><td>SharedEvent</td><td>models/SharedEvent.ts</td><td>Shared calendar events</td></tr>
+  </table>
+</section>
+
+<!-- 10. DATABASE -->
+<section>
+  <h2 class="sec">10. Database Guide</h2>
+
+  <h3>MongoDB</h3>
+  <p>Used for: User accounts, Tenants, File shares, Billing. Mail data (actual emails) is stored by Dovecot in <code>D:\maildata\mail\</code> in Maildir format.</p>
+  <pre><span class="comment"># Connect to MongoDB in Docker</span>
+docker exec -it mailserver-mongodb mongosh \
+  -u mailserver -p changeme \
+  --authenticationDatabase mailserver
+
+<span class="comment"># Common queries</span>
+use mailserver
+db.users.find()           <span class="comment"># List all admin/superadmin accounts</span>
+db.tenants.find()         <span class="comment"># List all company tenants</span>
+db.shares.find()          <span class="comment"># List all file shares</span></pre>
+
+  <div class="warn">⚠️ In development with <code>bash dev.sh</code>, the backend connects to a LOCAL MongoDB instance (no auth) at <code>localhost:27017</code>. In Docker, it connects to <code>mongodb:27017</code> with auth credentials from <code>.env</code>.</div>
+
+  <h3>Redis</h3>
+  <p>Used for: JWT refresh token allowlist / blacklist (session invalidation on logout).</p>
+  <pre><span class="comment"># Connect to Redis in Docker</span>
+docker exec -it mailserver-redis redis-cli -a $REDIS_PASSWORD</pre>
+</section>
+
+<hr class="page">
+
+<!-- 11. DOCKER REFERENCE -->
+<section>
+  <h2 class="sec">11. Docker Reference</h2>
+
+  <h3>Container Overview</h3>
+  <table>
+    <tr><th>Container</th><th>Image</th><th>Purpose</th><th>Port</th></tr>
+    <tr><td>mailserver-api</td><td>mailserver-api:local</td><td>Node.js REST API</td><td>3001 (host) → 3000 (internal)</td></tr>
+    <tr><td>mailserver-webmail</td><td>mailserver-webmail:local</td><td>React frontend (nginx)</td><td>internal only (via nginx proxy)</td></tr>
+    <tr><td>mailserver-nginx</td><td>nginx:alpine</td><td>Reverse proxy</td><td>8080, 8443</td></tr>
+    <tr><td>mailserver-mongodb</td><td>mongo</td><td>Database</td><td>27017 (internal)</td></tr>
+    <tr><td>mailserver-redis</td><td>redis:alpine</td><td>Token store</td><td>6379 (internal)</td></tr>
+    <tr><td>mailserver-dovecot</td><td>custom</td><td>IMAP server</td><td>993 (internal)</td></tr>
+    <tr><td>mailserver-postfix</td><td>custom</td><td>SMTP server</td><td>587 (internal)</td></tr>
+    <tr><td>mailserver-cloudflared</td><td>cloudflare/cloudflared</td><td>HTTPS tunnel</td><td>—</td></tr>
+    <tr><td>mailserver-collabora</td><td>collabora/code</td><td>Office editor</td><td>9980 (internal), 8082 (host dev)</td></tr>
+  </table>
+
+  <h3>Docker Commands Cheat Sheet</h3>
+  <pre><span class="comment"># View all running containers</span>
+docker ps
+
+<span class="comment"># View logs</span>
+docker logs mailserver-api -f
+docker logs mailserver-webmail -f
+
+<span class="comment"># Restart a single container</span>
+docker compose -f docker-compose.apps.yml restart api
+
+<span class="comment"># Rebuild one container after code change</span>
+docker compose -f docker-compose.apps.yml build webmail
+docker compose -f docker-compose.apps.yml up -d webmail
+
+<span class="comment"># Rebuild BOTH after changes to frontend AND backend</span>
+docker compose -f docker-compose.apps.yml build webmail api
+docker compose -f docker-compose.apps.yml up -d webmail api
+
+<span class="comment"># Full teardown and rebuild</span>
+docker compose -f docker-compose.apps.yml down
+docker compose -f docker-compose.apps.yml up -d --build
+
+<span class="comment"># Enter a running container shell</span>
+docker exec -it mailserver-api sh
+docker exec -it mailserver-webmail sh</pre>
+</section>
+
+<!-- 12. MAKING CHANGES -->
+<section>
+  <h2 class="sec">12. Making &amp; Deploying Changes</h2>
+
+  <h3>Workflow for Frontend Changes</h3>
+  <div class="step"><div class="step-num">1</div><div>Edit files in <code>frontend/src/</code></div></div>
+  <div class="step"><div class="step-num">2</div><div>Test locally: <code>bash dev.sh</code> → open <code>http://localhost:5173</code></div></div>
+  <div class="step"><div class="step-num">3</div><div>When satisfied, rebuild Docker:<pre>docker compose -f docker-compose.apps.yml build webmail
+docker compose -f docker-compose.apps.yml up -d webmail</pre></div></div>
+  <div class="step"><div class="step-num">4</div><div>Do a hard refresh in browser: <strong>Ctrl+Shift+R</strong></div></div>
+
+  <h3>Workflow for Backend Changes</h3>
+  <div class="step"><div class="step-num">1</div><div>Edit files in <code>backend/src/</code></div></div>
+  <div class="step"><div class="step-num">2</div><div>Test locally: <code>bash dev.sh</code> — backend restarts automatically via <code>tsx watch</code></div></div>
+  <div class="step"><div class="step-num">3</div><div>When satisfied, rebuild:<pre>docker compose -f docker-compose.apps.yml build api
+docker compose -f docker-compose.apps.yml up -d api</pre></div></div>
+
+  <h3>Adding a New Feature — Checklist</h3>
+  <table>
+    <tr><th>Step</th><th>Frontend</th><th>Backend</th></tr>
+    <tr><td>1</td><td>Create page/component in <code>frontend/src/pages/</code> or <code>components/</code></td><td>Create route in <code>backend/src/routes/</code></td></tr>
+    <tr><td>2</td><td>Add route in <code>App.tsx</code></td><td>Register route in <code>backend/src/index.ts</code></td></tr>
+    <tr><td>3</td><td>Add API function in <code>frontend/src/api/</code></td><td>Add Mongoose model if needed in <code>models/</code></td></tr>
+    <tr><td>4</td><td>Add nav link in <code>AppNavbar.tsx</code> and <code>Sidebar.tsx</code></td><td>Add auth middleware <code>requireAuth</code> to route</td></tr>
+    <tr><td>5</td><td>Rebuild webmail container</td><td>Rebuild api container</td></tr>
+  </table>
+</section>
+
+<hr class="page">
+
+<!-- 13. USER ROLES -->
+<section>
+  <h2 class="sec">13. User Roles &amp; Login</h2>
+  <p>All roles use the <strong>same login page</strong> at <code>/login</code>. After login, the server returns the user's role and the frontend redirects accordingly.</p>
+
+  <table>
+    <tr><th>Role</th><th>Stored In</th><th>Redirected To</th><th>Can Access</th></tr>
+    <tr><td><span class="badge badge-blue">user</span></td><td>Dovecot (IMAP auth)</td><td><code>/mail/INBOX</code></td><td>Mail, Calendar, Files, Contacts, Settings</td></tr>
+    <tr><td><span class="badge badge-orange">admin</span></td><td>MongoDB <code>users</code> collection</td><td><code>/admin/users</code></td><td>User management + all user features</td></tr>
+    <tr><td><span class="badge badge-purple">superadmin</span></td><td>MongoDB <code>users</code> collection</td><td><code>/superadmin/tenants</code></td><td>Tenant &amp; billing management</td></tr>
+  </table>
+
+  <h3>Creating a Superadmin Account</h3>
+  <pre><span class="comment"># Connect to MongoDB</span>
+docker exec -it mailserver-mongodb mongosh \
+  -u mailserver -p changeme \
+  --authenticationDatabase mailserver
+
+<span class="comment"># In mongosh — insert superadmin (password is hashed with argon2)</span>
+<span class="comment"># Use the /setup endpoint instead:</span>
+curl -X POST http://localhost:3001/setup/init \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@yourdomain.com","password":"yourpassword","role":"superadmin"}'</pre>
+
+  <h3>Login Page Location</h3>
+  <p>The universal login page is at: <code>frontend/src/pages/Login.tsx</code><br>
+  Role-based redirect logic is in the <code>roleHome()</code> function at the top of that file.</p>
+</section>
+
+<!-- 14. FILE STORAGE -->
+<section>
+  <h2 class="sec">14. File Storage</h2>
+  <p>Files are stored on the Windows host at <code>D:\maildata\files\</code> and mounted into the <code>api</code> Docker container at <code>/data/files</code>.</p>
+
+  <h3>Directory Structure</h3>
+  <pre>D:\maildata\files\
+  ├── user-at-domain-com\      ← sanitized email (@ → -at-, . → -)
+  │   ├── documents\
+  │   ├── Sent\               ← attachments from sent emails
+  │   └── received\
+  │       └── sender-at-domain-com\  ← attachments saved from received emails
+  └── anotheruserat-domain-com\</pre>
+
+  <h3>File Sharing</h3>
+  <p>Sharing is implemented in <code>backend/src/routes/files.ts</code> using the <code>Share</code> Mongoose model. The share record stores: <code>ownerEmail</code>, <code>path</code>, <code>sharedWith</code> (array of emails), <code>permission</code> (view/edit).</p>
+  <p>Shared files appear in the "Shared with me" tab in the Files page.</p>
+</section>
+
+<!-- 15. OFFICE EDITING (WOPI) -->
+<section>
+  <h2 class="sec">15. Office Editing (WOPI / Collabora)</h2>
+  <p>Clicking "Edit in Office" on a <code>.docx</code>, <code>.xlsx</code>, or <code>.pptx</code> file opens Collabora CODE editor in the browser. This uses the <strong>WOPI protocol</strong>.</p>
+
+  <h3>Flow</h3>
+  <pre>1. Frontend calls POST /wopi/token  →  gets {token, wopiSrc, editorUrl}
+2. Frontend opens Collabora at {editorUrl}?WOPISrc={wopiSrc}&access_token={token}
+3. Collabora fetches file from  GET  /wopi/files/{fileId}     (our API)
+4. Collabora saves file back to PUT  /wopi/files/{fileId}     (our API)
+5. Our API reads/writes from D:\maildata\files\{user}\{path}</pre>
+
+  <h3>Config Variables</h3>
+  <table>
+    <tr><th>Variable</th><th>Docker value</th><th>Dev value</th></tr>
+    <tr><td><code>COLLABORA_URL</code></td><td><code>http://collabora:9980</code></td><td><code>http://localhost:8082</code></td></tr>
+    <tr><td><code>WOPI_HOST</code></td><td><code>http://api:3000</code></td><td><code>http://host.docker.internal:3000</code></td></tr>
+  </table>
+
+  <div class="info">In dev mode, Collabora (running in Docker) needs to reach the backend on the host machine. It uses <code>host.docker.internal</code> (Windows Docker Desktop resolves this to the host IP automatically).</div>
+</section>
+
+<hr class="page">
+
+<!-- 16. COMMON ERRORS -->
+<section>
+  <h2 class="sec">16. Common Errors &amp; Fixes</h2>
+
+  <table>
+    <tr><th>Error</th><th>Cause</th><th>Fix</th></tr>
+    <tr>
+      <td>Changes not visible after editing code</td>
+      <td>Accessing port 80 (Docker container) instead of port 5173 (dev server)</td>
+      <td>Use <code>http://localhost:5173</code> in dev. OR rebuild Docker container and hard refresh (Ctrl+Shift+R)</td>
+    </tr>
+    <tr>
+      <td><code>Cannot find module 'tsx'</code></td>
+      <td>Corrupt or missing node_modules in backend</td>
+      <td><code>cd backend &amp;&amp; rm -rf node_modules package-lock.json &amp;&amp; npm install</code></td>
+    </tr>
+    <tr>
+      <td>Port 5173 only accessible on IPv6</td>
+      <td>Vite not binding to IPv4</td>
+      <td>Ensure <code>vite.config.ts</code> has <code>server: { host: "0.0.0.0" }</code></td>
+    </tr>
+    <tr>
+      <td>"Could not open editor" in Collabora</td>
+      <td>WOPI route not registered, wrong host config, or .env not loaded</td>
+      <td>Check <code>COLLABORA_URL</code> and <code>WOPI_HOST</code> env vars. Ensure <code>backend/.env</code> exists and has correct values. Restart backend.</td>
+    </tr>
+    <tr>
+      <td>MongoDB auth failing in dev</td>
+      <td>Local MongoDB has no users; Docker MongoDB requires credentials</td>
+      <td>Dev <code>backend/.env</code> should use <code>mongodb://localhost:27017/mailserver</code> (no auth)</td>
+    </tr>
+    <tr>
+      <td>Avatar/profile not loading</td>
+      <td>Token refresh wiping avatar from store</td>
+      <td>Fixed: <code>api/client.ts</code> refresh call preserves <code>cur.avatar</code></td>
+    </tr>
+    <tr>
+      <td>Avatar color (Tailwind class missing)</td>
+      <td>Tailwind JIT purges dynamic class names</td>
+      <td>Use <code>style={{ backgroundColor: hexColor }}</code> instead of dynamic Tailwind classes</td>
+    </tr>
+    <tr>
+      <td>Rollup missing (Windows install)</td>
+      <td>Corrupt package-lock with wrong binary</td>
+      <td><code>cd frontend &amp;&amp; rm -rf node_modules package-lock.json &amp;&amp; npm install</code></td>
+    </tr>
+    <tr>
+      <td>Docker build fails on Windows paths</td>
+      <td>Windows backslash in docker-compose volume path</td>
+      <td>Use forward slashes: <code>D:/maildata/files:/data/files</code></td>
+    </tr>
+  </table>
+</section>
+
+<!-- 17. KEY FILES -->
+<section>
+  <h2 class="sec">17. Key Files Quick Reference</h2>
+  <table>
+    <tr><th>What you want to change</th><th>File to edit</th></tr>
+    <tr><td>Add/remove a page route</td><td><code>frontend/src/App.tsx</code></td></tr>
+    <tr><td>Top navbar (authenticated app)</td><td><code>frontend/src/components/Layout/AppNavbar.tsx</code></td></tr>
+    <tr><td>Left sidebar / mail folders</td><td><code>frontend/src/components/Layout/Sidebar.tsx</code></td></tr>
+    <tr><td>Landing page</td><td><code>frontend/src/pages/LandingPage.tsx</code></td></tr>
+    <tr><td>Login page</td><td><code>frontend/src/pages/Login.tsx</code></td></tr>
+    <tr><td>Colour themes</td><td><code>frontend/src/lib/themes.ts</code></td></tr>
+    <tr><td>Auth state (token, role, avatar)</td><td><code>frontend/src/store/index.ts</code></td></tr>
+    <tr><td>HTTP client (axios + JWT refresh)</td><td><code>frontend/src/api/client.ts</code></td></tr>
+    <tr><td>Mail API calls (IMAP)</td><td><code>frontend/src/api/mailApi.ts</code></td></tr>
+    <tr><td>Backend entry point</td><td><code>backend/src/index.ts</code></td></tr>
+    <tr><td>Environment variables config</td><td><code>backend/src/config/index.ts</code></td></tr>
+    <tr><td>Authentication (login / refresh)</td><td><code>backend/src/routes/auth.ts</code></td></tr>
+    <tr><td>Email send/receive</td><td><code>backend/src/routes/mail.ts</code></td></tr>
+    <tr><td>File operations + sharing</td><td><code>backend/src/routes/files.ts</code></td></tr>
+    <tr><td>WOPI / office editing</td><td><code>backend/src/routes/wopi.ts</code></td></tr>
+    <tr><td>Nginx config (routing rules)</td><td><code>config/nginx/conf.d/</code></td></tr>
+    <tr><td>Docker services (app layer)</td><td><code>docker-compose.apps.yml</code></td></tr>
+    <tr><td>Docker services (mail core)</td><td><code>docker-compose.yml</code></td></tr>
+    <tr><td>Secrets / env vars</td><td><code>.env</code> (root) and <code>backend/.env</code></td></tr>
+  </table>
+</section>
+
+<!-- 18. CHECKLIST -->
+<section>
+  <h2 class="sec">18. Checklist for New Developer</h2>
+  <div class="success">Complete these steps before starting any development work.</div>
+  <br>
+  <table>
+    <tr><th>☐</th><th>Task</th><th>Notes</th></tr>
+    <tr><td>☐</td><td>Install Node.js v20 LTS</td><td>Download from nodejs.org</td></tr>
+    <tr><td>☐</td><td>Install Docker Desktop</td><td>Enable WSL2 backend on Windows</td></tr>
+    <tr><td>☐</td><td>Clone the repo &amp; check out <code>main</code> branch</td><td>Git on Windows</td></tr>
+    <tr><td>☐</td><td>Create <code>D:\maildata\files\</code> directory</td><td>Or update path in <code>.env</code></td></tr>
+    <tr><td>☐</td><td>Copy <code>.env.example</code> to <code>.env</code> and fill secrets</td><td>Root directory</td></tr>
+    <tr><td>☐</td><td>Copy <code>backend/.env.example</code> to <code>backend/.env</code></td><td>Set dev MongoDB URI</td></tr>
+    <tr><td>☐</td><td>Run <code>bash dev.sh --install</code></td><td>Installs npm deps + starts dev servers</td></tr>
+    <tr><td>☐</td><td>Open <code>http://localhost:5173</code> and verify landing page loads</td><td>—</td></tr>
+    <tr><td>☐</td><td>Start Docker core services: <code>docker compose -f docker-compose.yml up -d</code></td><td>MongoDB, Redis, Dovecot, Postfix</td></tr>
+    <tr><td>☐</td><td>Try logging in at <code>http://localhost:5173/login</code></td><td>Create user via admin panel first</td></tr>
+    <tr><td>☐</td><td>Read <code>DEV.md</code> and <code>README.md</code> in the project root</td><td>Additional context</td></tr>
+    <tr><td>☐</td><td>Understand the Docker two-compose pattern</td><td><code>docker-compose.yml</code> = mail core, <code>docker-compose.apps.yml</code> = app layer</td></tr>
+  </table>
+
+  <h3 style="margin-top:24px">Important Reminders</h3>
+  <ul>
+    <li>Never commit <code>.env</code> files with real secrets to Git</li>
+    <li>Always use <code>http://localhost:5173</code> in dev, not port 80</li>
+    <li>After any code change → rebuild the Docker container before testing in production</li>
+    <li>Browser hard refresh (<strong>Ctrl+Shift+R</strong>) after container rebuild</li>
+    <li>The <code>D:\maildata\</code> folder contains all user data — back it up regularly</li>
+    <li>MongoDB user data and mail accounts are separate: mail users live in Dovecot, admin/superadmin live in MongoDB</li>
+  </ul>
+</section>
+
+</main>
+
+<footer style="background:#0f172a;color:#64748b;text-align:center;padding:20px;font-size:11px;margin-top:40px;">
+  MailServer Developer Handover Document &nbsp;·&nbsp; Generated April 2026 &nbsp;·&nbsp; Confidential — Internal Use Only
+</footer>
+
+</body>
+</html>

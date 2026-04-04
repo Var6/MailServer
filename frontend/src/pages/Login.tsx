@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff, Mail } from "lucide-react";
 import { useAuthStore } from "../store/index.ts";
 import { login } from "../api/authApi.ts";
 
@@ -49,7 +49,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Navbar */}
+      <nav className="border-b border-gray-100 bg-white/80 backdrop-blur-md shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-14">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="bg-blue-600 text-white rounded-lg p-1.5">
+              <Mail size={18} />
+            </div>
+            <span className="text-lg font-bold text-gray-900 tracking-tight">MailServer</span>
+          </Link>
+          <Link to="/" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+            ← Back to home
+          </Link>
+        </div>
+      </nav>
+
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
       {/* Logo */}
       <div className="mb-8 text-center">
         <div className="w-14 h-14 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
@@ -165,6 +181,12 @@ export default function LoginPage() {
       <div className="mt-10 text-center">
         <p className="text-xs text-[#5f6368]">Self-hosted · Private · Secure</p>
       </div>
+      </div>
+
+      {/* Bottom footer bar */}
+      <footer className="border-t border-gray-100 py-4">
+        <p className="text-center text-xs text-gray-400">MailServer · Self-hosted · Private · Secure</p>
+      </footer>
     </div>
   );
 }

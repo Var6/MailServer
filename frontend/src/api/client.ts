@@ -28,10 +28,11 @@ apiClient.interceptors.response.use(
         const { data } = await axios.post("/api/auth/refresh", {}, { withCredentials: true });
         const cur = useAuthStore.getState();
         useAuthStore.getState().setAuth(data.accessToken, {
-          email: data.user?.email ?? cur.email!,
-          role:  data.user?.role  ?? cur.role!,
-          domain: data.user?.domain ?? cur.domain!,
+          email:       data.user?.email       ?? cur.email!,
+          role:        data.user?.role        ?? cur.role!,
+          domain:      data.user?.domain      ?? cur.domain!,
           displayName: data.user?.displayName ?? cur.displayName ?? undefined,
+          avatar:      cur.avatar             ?? undefined,
         });
         err.config.headers.Authorization = `Bearer ${data.accessToken}`;
         return apiClient(err.config);
