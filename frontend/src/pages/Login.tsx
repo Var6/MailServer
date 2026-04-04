@@ -81,10 +81,6 @@ export default function LoginPage() {
               {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
             </div>
 
-            <div className="text-xs text-[#5f6368] leading-relaxed">
-              Not your computer? Use a Private window to sign in.
-            </div>
-
             <div className="flex justify-end pt-2">
               <button type="submit" className="btn-primary px-6 py-2.5">Next</button>
             </div>
@@ -168,11 +164,6 @@ export default function LoginPage() {
       {/* Footer */}
       <div className="mt-10 text-center">
         <p className="text-xs text-[#5f6368]">Self-hosted · Private · Secure</p>
-        <div className="flex gap-4 justify-center mt-2 text-xs text-[#5f6368]">
-          <a href="#" className="hover:underline">Help</a>
-          <a href="#" className="hover:underline">Privacy</a>
-          <a href="#" className="hover:underline">Terms</a>
-        </div>
       </div>
     </div>
   );

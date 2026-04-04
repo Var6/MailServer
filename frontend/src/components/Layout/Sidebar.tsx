@@ -326,7 +326,8 @@ export default function Sidebar() {
                 <img src={avatar} alt="avatar" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
               ) : (
                 <div
-                  className={`avatar ${color} w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}
+                  className="avatar w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                  style={{ backgroundColor: color }}
                 >
                   {initial}
                 </div>
@@ -373,7 +374,8 @@ export default function Sidebar() {
             <img src={avatar} alt="avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
           ) : (
             <div
-              className={`avatar ${color} text-xs w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}
+              className="avatar text-xs w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+              style={{ backgroundColor: color }}
             >
               {initial}
             </div>

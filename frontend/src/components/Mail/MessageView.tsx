@@ -389,7 +389,7 @@ export default function MessageView() {
 
             {/* Sender row */}
             <div className="flex items-start gap-3 mb-6">
-              <div className={`avatar ${senderColor} w-10 h-10`}>{senderInit}</div>
+              <div className="avatar w-10 h-10" style={{ backgroundColor: senderColor }}>{senderInit}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <div>

@@ -3,9 +3,16 @@ import { Users, Mail, Phone, Search } from "lucide-react";
 import { useState } from "react";
 import { apiClient } from "../api/client.ts";
 import { avatarColor } from "../lib/utils.ts";
+import { useTheme } from "../lib/themes.ts";
 
 export default function ContactsPage() {
   const [query, setQuery] = useState("");
+  const { appBg, textColor, isDark } = useTheme();
+  const border  = isDark ? "#374151" : "#e5e7eb";
+  const muted   = isDark ? "#9ca3af" : "#6b7280";
+  const cardBg  = isDark ? "#1f2937" : "#ffffff";
+  const inputBg = isDark ? "#111827" : "#f9fafb";
+  const hoverBg = isDark ? "#374151" : "#f3f4f6";
 
   const { data, isLoading } = useQuery({
     queryKey: ["contacts"],
@@ -18,22 +25,22 @@ export default function ContactsPage() {
   );
 
   return (
-    <div className="h-full bg-white flex flex-col">
+    <div className="h-full flex flex-col" style={{ background: appBg, color: textColor }}>
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-6 py-4 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: border }}>
         <div className="flex items-center gap-2">
           <Users size={20} className="text-blue-600" />
-          <h1 className="font-semibold text-[#202124]">Contacts</h1>
-          {data && <span className="text-xs text-[#5f6368] ml-1">({data.length})</span>}
+          <h1 className="font-semibold" style={{ color: textColor }}>Contacts</h1>
+          {data && <span className="text-xs ml-1" style={{ color: muted }}>({data.length})</span>}
         </div>
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: muted }} />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search contacts..."
-            className="border border-gray-200 rounded-full pl-9 pr-4 py-2 text-sm focus:outline-none
-                       focus:ring-2 focus:ring-blue-300 bg-gray-50 w-56"
+            className="rounded-full pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 border w-56"
+            style={{ backgroundColor: inputBg, borderColor: border, color: textColor }}
           />
         </div>
       </div>
@@ -54,13 +61,13 @@ export default function ContactsPage() {
         )}
 
         {!isLoading && contacts.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center">
-              <Users size={36} className="opacity-40" />
+          <div className="flex flex-col items-center justify-center h-64 gap-3">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: isDark ? "#374151" : "#f3f4f6" }}>
+              <Users size={36} className="opacity-40" style={{ color: muted }} />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-[#5f6368]">No contacts found</p>
-              <p className="text-xs mt-1">Contacts are synced from Nextcloud CardDAV</p>
+              <p className="text-sm font-medium" style={{ color: muted }}>No contacts found</p>
+              <p className="text-xs mt-1" style={{ color: muted }}>Contacts are synced from Nextcloud CardDAV</p>
             </div>
           </div>
         )}
@@ -73,31 +80,39 @@ export default function ContactsPage() {
               return (
                 <div
                   key={i}
-                  className="flex items-center gap-3 p-4 border border-gray-100 rounded-xl
-                             hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer group"
+                  className="flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer group border"
+                  style={{ backgroundColor: cardBg, borderColor: border, color: textColor }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = hoverBg; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = cardBg; }}
                 >
-                  <div className={`avatar ${color} w-11 h-11 text-base flex-shrink-0`}>
+                  <div className="avatar w-11 h-11 text-base flex-shrink-0" style={{ backgroundColor: color }}>
                     {name[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#202124] truncate">{name}</p>
+                    <p className="text-sm font-medium truncate" style={{ color: textColor }}>{name}</p>
                     {contact.email && (
-                      <p className="text-xs text-[#5f6368] truncate">{contact.email}</p>
+                      <p className="text-xs truncate" style={{ color: muted }}>{contact.email}</p>
                     )}
                     {contact.phone && (
-                      <p className="text-xs text-[#5f6368] truncate">{contact.phone}</p>
+                      <p className="text-xs truncate" style={{ color: muted }}>{contact.phone}</p>
                     )}
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {contact.email && (
                       <a href={`mailto:${contact.email}`}
-                         className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-blue-600">
+                         className="p-1.5 rounded-full transition-colors"
+                         style={{ color: muted }}
+                         onMouseEnter={e => (e.currentTarget.style.color = "#2563eb")}
+                         onMouseLeave={e => (e.currentTarget.style.color = muted)}>
                         <Mail size={14} />
                       </a>
                     )}
                     {contact.phone && (
                       <a href={`tel:${contact.phone}`}
-                         className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-green-600">
+                         className="p-1.5 rounded-full transition-colors"
+                         style={{ color: muted }}
+                         onMouseEnter={e => (e.currentTarget.style.color = "#16a34a")}
+                         onMouseLeave={e => (e.currentTarget.style.color = muted)}>
                         <Phone size={14} />
                       </a>
                     )}

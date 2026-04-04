@@ -18,6 +18,7 @@ import http from "http";
 import { userRootPath } from "../services/localFileService.js";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config/index.js";
+import { verifySharedAccess } from "./files.js";
 
 // Fetch the editor URL from Collabora's discovery endpoint
 // Returns something like "https://collabora:9980/browser/38f303a437/cool.html?"
@@ -160,6 +161,31 @@ router.post("/files/:fileId/contents", wopiAuth, (req: Request, res: Response): 
   } catch {
     res.status(500).json({ error: "Save failed" });
   }
+});
+
+// ── POST /wopi/shared-token?owner=...&path=...  ───────────────────────────────
+// Called by the frontend to get a WOPI token for a file shared with the user.
+router.post("/shared-token", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const ownerEmail = req.query.owner as string;
+  const filePath   = sanitizePath((req.query.path as string) ?? "");
+  if (!ownerEmail || !filePath || filePath === "/") {
+    res.status(400).json({ error: "owner and path required" }); return;
+  }
+  const perm = await verifySharedAccess(ownerEmail, filePath, req.user!.sub);
+  if (!perm) { res.status(403).json({ error: "Access denied" }); return; }
+  const fileId = makeFileId(ownerEmail, filePath);
+  const token = jwt.sign(
+    { sub: req.user!.sub, ownerEmail, path: filePath, perm },
+    config.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+  const editorPath = await getEditorBase();
+  res.json({
+    token,
+    tokenTtl: Date.now() + 3600 * 1000,
+    wopiSrc: `${config.WOPI_HOST}/wopi/files/${fileId}`,
+    editorPath,
+  });
 });
 
 export default router;

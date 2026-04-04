@@ -303,7 +303,7 @@ export default function ComposeModal() {
           {avatar ? (
             <img src={avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
           ) : (
-            <div className={`avatar ${avatarColor(authEmail ?? "")} w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0`}>
+            <div className="avatar w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0" style={{ backgroundColor: avatarColor(authEmail ?? "") }}>
               {(authName || authEmail)?.[0]?.toUpperCase() ?? "?"}
             </div>
           )}

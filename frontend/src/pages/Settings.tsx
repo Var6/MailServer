@@ -214,7 +214,7 @@ export default function SettingsPage() {
               {profile?.avatar ? (
                 <img src={profile.avatar} alt="avatar" className="w-20 h-20 rounded-full object-cover" />
               ) : (
-                <div className={`avatar ${color} w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+                <div className="avatar w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: color }}>
                   {initial}
                 </div>
               )}

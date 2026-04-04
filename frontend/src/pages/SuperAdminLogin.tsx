@@ -162,20 +162,6 @@ export default function SuperAdminLoginPage() {
           </form>
         )}
 
-        <div className="mt-6 pt-5 border-t border-white/20 space-y-2 text-center">
-          <p className="text-xs text-purple-200">
-            Company Admin?{" "}
-            <Link to="/admin/login" className="text-white hover:underline font-medium">
-              Admin Portal →
-            </Link>
-          </p>
-          <p className="text-xs text-purple-200">
-            Regular User?{" "}
-            <Link to="/login" className="text-white hover:underline font-medium">
-              User Portal →
-            </Link>
-          </p>
-        </div>
       </div>
 
       <p className="mt-8 text-xs text-purple-300">

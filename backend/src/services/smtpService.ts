@@ -5,7 +5,7 @@ import type { SendMailOptions } from "../types/index.js";
 function createTransport(_user: string, _pass: string) {
   const host = config.SMTP_HOST;
 
-  // Dev mode: if SMTP_HOST is not configured, use Ethereal (fake SMTP — emails viewable at the URL logged below)
+  // Dev mode: if SMTP_HOST is not configured, use Ethereal (fake SMTP)
   if (!host) {
     return null; // signal to use Ethereal per-send
   }
@@ -51,12 +51,7 @@ export async function sendMail(opts: SendMailOptions, senderPassword: string): P
       secure: false,
       auth: { user: testAccount.user, pass: testAccount.pass },
     });
-    const info = await ethereal.sendMail(message);
-    console.log("\n📧  DEV MODE — email captured by Ethereal (not actually sent)");
-    console.log(`    From:    ${opts.from}`);
-    console.log(`    To:      ${toAddr}`);
-    console.log(`    Subject: ${opts.subject}`);
-    console.log(`    Preview: ${nodemailer.getTestMessageUrl(info)}\n`);
+    await ethereal.sendMail(message);
     return;
   }
 

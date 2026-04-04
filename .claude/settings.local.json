@@ -40,7 +40,8 @@
       "Bash(\"/c/Users/Ashish/Desktop/Language prop/Mail/config/postfix/main.cf\":*)",
       "Bash(grep -v warning sleep 8 docker logs mailserver-postfix --tail 20)",
       "Bash(grep -v \"^$\")",
-      "Bash(/dev/null sleep:*)"
+      "Bash(/dev/null sleep:*)",
+      "Bash(grep -n \"Stored on\\\\|storageInfo\\\\|storage-info\\\\|location.*maildata\\\\|files\\\\\\\\\\\\\\\\\" \"d:/Language prop/Mail/frontend/src/pages/Files.tsx\")"
     ],
     "additionalDirectories": [
       "\\^# --- Outbound SMTP Relay (Brevo) ---\\,\\^smtp_tls_wrappermode.*$",
