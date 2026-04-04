@@ -151,6 +151,7 @@ const sendSchema = z.object({
   subject: z.string(),
   text: z.string().optional(),
   html: z.string().optional(),
+  fromName: z.string().optional(),
   attachments: z.array(z.object({
     filename: z.string(),
     content: z.string(),      // base64
@@ -161,8 +162,10 @@ const sendSchema = z.object({
 router.post("/send", async (req, res, next) => {
   try {
     const opts = sendSchema.parse(req.body);
-    const from = req.user!.sub;
+    const email = req.user!.sub;
     const password = req.userPassword!;
+    // Format: "Display Name <email>" if name provided, otherwise just email
+    const from = opts.fromName ? `${opts.fromName} <${email}>` : email;
     const attachments = opts.attachments?.map(a => ({
       filename: a.filename,
       content: Buffer.from(a.content, "base64"),
@@ -170,7 +173,7 @@ router.post("/send", async (req, res, next) => {
     }));
     await sendMail({ ...opts, from, attachments }, password);
     const toStr = Array.isArray(opts.to) ? opts.to.join(", ") : opts.to;
-    imap.appendToSent(from, password, { from, to: toStr, subject: opts.subject, text: opts.text, html: opts.html, attachments }).catch(() => {});
+    imap.appendToSent(email, password, { from, to: toStr, subject: opts.subject, text: opts.text, html: opts.html, attachments }).catch(() => {});
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

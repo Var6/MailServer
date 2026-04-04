@@ -206,6 +206,7 @@ export default function ComposeModal() {
       const text = editor?.getText() ?? "";
       return sendMail({
         to, cc: cc || undefined, bcc: bcc || undefined, subject,
+        fromName: authName || undefined,
         html: `<div style="font-family:Inter,sans-serif;font-size:14px;line-height:1.6;">${html}</div>`,
         text,
         attachments: attachments.length

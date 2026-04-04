@@ -12,11 +12,11 @@ export function formatFullDate(dateStr: string | Date): string {
   return format(new Date(dateStr), "EEE, MMM d, yyyy 'at' h:mm a");
 }
 
-// Deterministic color from string
+// Deterministic color from string — returns a hex value for use in inline styles
 const AVATAR_COLORS = [
-  "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-green-600",
-  "bg-teal-600", "bg-blue-600", "bg-indigo-600", "bg-purple-600",
-  "bg-pink-600", "bg-rose-500",
+  "#ef4444", "#f97316", "#f59e0b", "#16a34a",
+  "#0d9488", "#2563eb", "#4f46e5", "#9333ea",
+  "#db2777", "#e11d48",
 ];
 
 export function avatarColor(name: string): string {

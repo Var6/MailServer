@@ -28,6 +28,7 @@ export const openAttachmentOnline = (uid: number, folder: string, index: number)
 
 export const sendMail = (payload: {
   to: string; cc?: string; bcc?: string; subject: string; html?: string; text?: string;
+  fromName?: string;
   attachments?: Array<{ filename: string; content: string; contentType: string }>;
 }, onUploadProgress?: (event: AxiosProgressEvent) => void) =>
   apiClient.post("/mail/send", payload, { onUploadProgress }).then(r => r.data);

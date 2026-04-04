@@ -303,7 +303,7 @@ function MailItem({
         </div>
 
         {!showCheckbox && (
-          <div className={`avatar text-xs flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold ${avatarColor(msg.from)}`}>
+          <div className="avatar text-xs flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold" style={{ backgroundColor: avatarColor(msg.from) }}>
             {senderInitial(msg.from)}
           </div>
         )}
