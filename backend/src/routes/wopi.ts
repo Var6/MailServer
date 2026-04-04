@@ -24,15 +24,14 @@ import { config } from "../config/index.js";
 let cachedEditorBase: string | null = null;
 async function getEditorBase(): Promise<string> {
   if (cachedEditorBase) return cachedEditorBase;
+  const discoveryUrl = `${config.COLLABORA_URL}/hosting/discovery`;
   return new Promise((resolve) => {
-    http.get("http://collabora:9980/hosting/discovery", (res) => {
+    const req = http.get(discoveryUrl, (res) => {
       let data = "";
       res.on("data", c => data += c);
       res.on("end", () => {
         const m = data.match(/urlsrc="([^"]+)"/);
         if (m) {
-          // Convert internal collabora hostname to relative path for the browser
-          // e.g. https://collabora:9980/browser/abc123/cool.html? → /browser/abc123/cool.html
           const url = new URL(m[1]);
           cachedEditorBase = url.pathname.replace(/\?$/, "");
         } else {
@@ -40,7 +39,13 @@ async function getEditorBase(): Promise<string> {
         }
         resolve(cachedEditorBase!);
       });
-    }).on("error", () => {
+    });
+    req.on("error", () => {
+      cachedEditorBase = "/browser/dist/cool.html";
+      resolve(cachedEditorBase);
+    });
+    req.setTimeout(3000, () => {
+      req.destroy();
       cachedEditorBase = "/browser/dist/cool.html";
       resolve(cachedEditorBase);
     });
@@ -92,8 +97,8 @@ router.post("/token", requireAuth, async (req: Request, res: Response): Promise<
   res.json({
     token,
     tokenTtl: Date.now() + 3600 * 1000,
-    // Collabora calls this URL directly — use internal Docker hostname
-    wopiSrc: `http://api:3000/wopi/files/${fileId}`,
+    // Collabora calls this URL directly — must be reachable from inside Docker
+    wopiSrc: `${config.WOPI_HOST}/wopi/files/${fileId}`,
     // editorPath is the browser-relative path, e.g. /browser/38f303a437/cool.html
     editorPath,
     fileId,

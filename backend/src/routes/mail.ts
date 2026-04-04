@@ -1,10 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import path from "path";
 import { requireAuth } from "../middleware/auth.js";
 import * as imap from "../services/imapService.js";
 import { sendMail } from "../services/smtpService.js";
-import { provisionUser, uploadFile } from "../services/nextcloudService.js";
 import { uploadLocalFile } from "../services/localFileService.js";
 
 const router = Router();
@@ -96,14 +94,11 @@ router.post("/messages/:uid/attachments/:index/edit-online", async (req, res, ne
 
     const safeFilename = attachment.filename.replace(/[\\/:*?"<>|]/g, "_");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const targetPath = `/Mail Attachments/${stamp}-${safeFilename}`;
+    const filePath = `/Mail Attachments/${stamp}-${safeFilename}`;
 
-    await provisionUser(email, password).catch(() => {});
-    await uploadFile(email, password, targetPath, attachment.content, attachment.contentType);
+    await uploadLocalFile(email, filePath, attachment.content);
 
-    const dir = path.posix.dirname(targetPath);
-    const redirect = `/index.php/apps/files/?dir=${encodeURIComponent(dir)}&openfile=${encodeURIComponent(targetPath)}`;
-    res.json({ ok: true, targetPath, redirect, filename: attachment.filename });
+    res.json({ ok: true, path: filePath, filename: attachment.filename });
   } catch (e) { next(e); }
 });
 
@@ -125,11 +120,23 @@ router.post("/messages/:uid/attachments/:index/save-to-files", async (req, res, 
     if (Number.isNaN(uid) || Number.isNaN(index) || index < 0) {
       res.status(400).json({ error: "Invalid uid or attachment index" }); return;
     }
-    const attachment = await imap.fetchAttachment(req.user!.sub, req.userPassword!, folder, uid, index);
+    const [attachment, message] = await Promise.all([
+      imap.fetchAttachment(req.user!.sub, req.userPassword!, folder, uid, index),
+      imap.fetchMessage(req.user!.sub, req.userPassword!, folder, uid),
+    ]);
     if (!attachment) { res.status(404).json({ error: "Attachment not found" }); return; }
 
+    // Determine sender subfolder: "Sent" if sent by me, otherwise sanitized sender email
+    const fromRaw = message?.from ?? "";
+    const emailMatch = fromRaw.match(/<([^>]+)>/);
+    const senderEmail = (emailMatch ? emailMatch[1] : fromRaw.trim()).toLowerCase();
+    const isSent = /sent/i.test(folder) || senderEmail === req.user!.sub.toLowerCase();
+    const senderFolder = isSent
+      ? "Sent"
+      : (senderEmail || "Unknown").replace(/[\\/:*?"<>|]/g, "_");
+
     const safeFilename = attachment.filename.replace(/[\\/:*?"<>|]/g, "_");
-    const filePath = `/Mail Attachments/${safeFilename}`;
+    const filePath = `/Mail Attachments/${senderFolder}/${safeFilename}`;
     await uploadLocalFile(req.user!.sub, filePath, attachment.content);
     res.json({ ok: true, path: filePath });
   } catch (e) { next(e); }

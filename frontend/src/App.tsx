@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore, type UserRole } from "./store/index.ts";
 import LandingPage         from "./pages/LandingPage.tsx";
 import LoginPage           from "./pages/Login.tsx";
-import AdminLoginPage      from "./pages/AdminLogin.tsx";
 import SuperAdminLoginPage from "./pages/SuperAdminLogin.tsx";
 import InboxPage           from "./pages/Inbox.tsx";
 import CalendarPage        from "./pages/Calendar.tsx";
@@ -23,7 +22,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 function RequireRole({ roles, children }: { roles: UserRole[]; children: JSX.Element }) {
   const role = useAuthStore(s => s.role);
-  if (!role || !roles.includes(role)) return <Navigate to={getDefaultMailRoute()} replace />;
+  if (!role || !roles.includes(role)) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -36,7 +35,7 @@ export default function App() {
 
         {/* Auth pages */}
         <Route path="/login"            element={<LoginPage />} />
-        <Route path="/admin/login"      element={<AdminLoginPage />} />
+        <Route path="/admin/login"      element={<LoginPage />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
 
         {/* Protected app routes — pathless layout route */}

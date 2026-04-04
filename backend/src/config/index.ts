@@ -39,6 +39,14 @@ const envSchema = z.object({
   LOCAL_FILES_ROOT:           z.string().default("./data/local-files"),
   LOCAL_FILES_HOST_PATH:      z.string().optional(),
 
+  // Collabora / WOPI
+  // COLLABORA_URL: URL the backend uses to reach Collabora's discovery endpoint
+  //   Docker default: http://collabora:9980   Dev override: http://localhost:8082
+  COLLABORA_URL:              z.string().default("http://collabora:9980"),
+  // WOPI_HOST: base URL Collabora uses to call back to this WOPI server
+  //   Docker default: http://api:3000         Dev override: http://host.docker.internal:3000
+  WOPI_HOST:                  z.string().default("http://api:3000"),
+
   // Domain
   MAIL_DOMAIN:           z.string().default("yourdomain.com"),
 

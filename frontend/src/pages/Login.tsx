@@ -1,25 +1,29 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuthStore } from "../store/index.ts";
 import { login } from "../api/authApi.ts";
 
+function roleHome(role: string): string {
+  if (role === "superadmin") return "/superadmin/tenants";
+  if (role === "admin")      return "/admin/users";
+  return "/mail/INBOX";
+}
+
 export default function LoginPage() {
   const nav = useNavigate();
-  const { accessToken, setAuth } = useAuthStore();
-  // role redirect handled in useEffect above
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
+  const { accessToken, setAuth, role } = useAuthStore();
+
+  const [email, setEmail]             = useState("");
+  const [password, setPassword]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [step, setStep]         = useState<"email" | "password">("email");
+  const [error, setError]             = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [step, setStep]               = useState<"email" | "password">("email");
 
-  const role = useAuthStore(s => s.role);
-
+  // Already logged in → go home
   useEffect(() => {
-    if (!accessToken || role !== "user") return;
-    nav("/inbox", { replace: true });
+    if (accessToken && role) nav(roleHome(role), { replace: true });
   }, [accessToken, role, nav]);
 
   const handleEmailNext = (e: React.FormEvent) => {
@@ -35,14 +39,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { accessToken, user } = await login(email, password);
-      if (user.role !== "user") {
-        setError("This portal is for regular users. Admins, please use the admin portal.");
-        setLoading(false);
-        return;
-      }
       setAuth(accessToken, { email: user.email, role: user.role, domain: user.domain, displayName: user.displayName });
       sessionStorage.setItem("mp", password);
-      // nav handled by useEffect role redirect
+      nav(roleHome(user.role), { replace: true });
     } catch {
       setError("Wrong email or password. Try again.");
       setLoading(false);
@@ -59,8 +58,8 @@ export default function LoginPage() {
             <polyline points="22,6 12,13 2,6"/>
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold text-[#202124]">Sign in to your mailbox</h1>
-        <p className="text-sm text-[#5f6368] mt-1">MailServer · User Portal</p>
+        <h1 className="text-2xl font-semibold text-[#202124]">Sign in</h1>
+        <p className="text-sm text-[#5f6368] mt-1">MailServer</p>
       </div>
 
       <div className="w-full max-w-sm">
@@ -83,14 +82,11 @@ export default function LoginPage() {
             </div>
 
             <div className="text-xs text-[#5f6368] leading-relaxed">
-              Not your computer? Use a Private window to sign in.{" "}
-              <a href="#" className="text-blue-600 hover:underline">Learn more</a>
+              Not your computer? Use a Private window to sign in.
             </div>
 
             <div className="flex justify-end pt-2">
-              <button type="submit" className="btn-primary px-6 py-2.5">
-                Next
-              </button>
+              <button type="submit" className="btn-primary px-6 py-2.5">Next</button>
             </div>
           </form>
         ) : (
@@ -143,8 +139,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            <a href="#" className="text-sm text-blue-600 hover:underline block">Forgot password?</a>
-
             <div className="flex items-center justify-between pt-2">
               <button
                 type="button"
@@ -171,19 +165,9 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Admin portal link */}
-      <div className="mt-6 text-center">
-        <p className="text-xs text-[#5f6368]">
-          Admin or Super Admin?{" "}
-          <Link to="/admin/login" className="text-indigo-600 hover:underline font-medium">
-            Go to Admin Portal →
-          </Link>
-        </p>
-      </div>
-
       {/* Footer */}
-      <div className="mt-6 text-center">
-        <p className="text-xs text-[#5f6368]">Self-hosted • Private • Secure</p>
+      <div className="mt-10 text-center">
+        <p className="text-xs text-[#5f6368]">Self-hosted · Private · Secure</p>
         <div className="flex gap-4 justify-center mt-2 text-xs text-[#5f6368]">
           <a href="#" className="hover:underline">Help</a>
           <a href="#" className="hover:underline">Privacy</a>

@@ -152,9 +152,34 @@ export default function MessageView() {
   const saveToFilesMutation = useMutation({
     mutationFn: ({ index }: { index: number; filename: string }) =>
       saveAttachmentToFiles(selectedUid!, selectedFolder, index),
-    onSuccess: (_, { filename }) => addToast(`"${filename}" saved to Files`, "success"),
+    onSuccess: (_data, { filename }) => addToast(`"${filename}" saved to Files`, "success"),
     onError: () => addToast("Could not save to Files", "error"),
   });
+
+  // ── Attachment labels (stored in localStorage) ────────────────────────────
+  const [attachmentLabels, setAttachmentLabels] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("mail_attachment_labels") ?? "{}"); } catch { return {}; }
+  });
+  const [labelMenuIdx, setLabelMenuIdx] = useState<number | null>(null);
+
+  const LABEL_COLORS = [
+    { name: "red",    bg: "#ef4444" },
+    { name: "orange", bg: "#f97316" },
+    { name: "yellow", bg: "#eab308" },
+    { name: "green",  bg: "#22c55e" },
+    { name: "blue",   bg: "#3b82f6" },
+    { name: "purple", bg: "#a855f7" },
+  ];
+
+  const labelKey  = (i: number) => `${selectedUid}_${i}`;
+  const applyLabel = (i: number, color: string | null) => {
+    const key  = labelKey(i);
+    const next = { ...attachmentLabels };
+    if (color === null) delete next[key]; else next[key] = color;
+    setAttachmentLabels(next);
+    localStorage.setItem("mail_attachment_labels", JSON.stringify(next));
+    setLabelMenuIdx(null);
+  };
 
   // ── Edit online (Office via Collabora) ────────────────────────────────────
   const editMutation = useMutation({
@@ -416,7 +441,7 @@ export default function MessageView() {
                     {msg.attachments.length} attachment{msg.attachments.length !== 1 ? "s" : ""}
                   </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   {msg.attachments.map((att, i) => {
                     const kind = fileKind(att.filename);
                     const canView = kind === "pdf" || kind === "image";
@@ -425,36 +450,44 @@ export default function MessageView() {
                     const isViewing    = viewMutation.isPending    && viewMutation.variables?.index === i;
                     const isEditing    = editMutation.isPending    && editMutation.variables?.index === i;
                     const isSaving     = saveToFilesMutation.isPending && saveToFilesMutation.variables?.index === i;
+                    const labelColor   = attachmentLabels[labelKey(i)];
 
                     return (
                       <div
                         key={i}
                         className="flex flex-col rounded-xl border overflow-hidden transition-shadow hover:shadow-md"
-                        style={{ borderColor: border, backgroundColor: isDark ? "#1f2937" : "white" }}
+                        style={{
+                          borderColor: labelColor ?? border,
+                          borderLeftWidth: labelColor ? "3px" : undefined,
+                          backgroundColor: isDark ? "#1f2937" : "white",
+                        }}
                       >
-                        {/* Top: icon + name */}
-                        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg(att.filename)}`}>
-                            <FileIcon name={att.filename} size={20} />
+                        {/* Top: icon + name + label dot */}
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg(att.filename)}`}>
+                            <FileIcon name={att.filename} size={18} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold truncate leading-tight" style={{ color: textColor }} title={att.filename}>
+                            <p className="text-xs font-semibold truncate" style={{ color: textColor }} title={att.filename}>
                               {att.filename}
                             </p>
                             <p className="text-xs mt-0.5" style={{ color: mutedColor }}>{formatBytes(att.size)}</p>
                           </div>
+                          {labelColor && (
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: labelColor }} />
+                          )}
                         </div>
 
-                        {/* Bottom: action buttons */}
+                        {/* Bottom: all action buttons on one row */}
                         <div
-                          className="flex items-center gap-1.5 px-3 pb-3 pt-1 border-t mt-auto"
+                          className="flex items-center gap-1.5 px-3 pb-3 pt-2 border-t"
                           style={{ borderColor: border }}
                         >
-                          {/* Download — always available */}
+                          {/* Download */}
                           <button
                             onClick={() => downloadMutation.mutate({ index: i, filename: att.filename })}
                             disabled={isDownloading}
-                            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors hover:bg-gray-50 disabled:opacity-50"
+                            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                             style={{ borderColor: border, color: textColor }}
                             title="Download"
                           >
@@ -498,6 +531,50 @@ export default function MessageView() {
                             <FolderInput size={12} />
                             {isSaving ? "…" : "Save"}
                           </button>
+
+                          {/* Label / Mark */}
+                          <div className="relative ml-auto">
+                            <button
+                              onClick={() => setLabelMenuIdx(labelMenuIdx === i ? null : i)}
+                              className="flex items-center justify-center w-7 h-7 rounded-lg border transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                              style={{ borderColor: border }}
+                              title={labelColor ? "Change label" : "Add label"}
+                            >
+                              <div
+                                className="w-3.5 h-3.5 rounded-full border-2 transition-colors"
+                                style={{
+                                  backgroundColor: labelColor ?? "transparent",
+                                  borderColor: labelColor ?? mutedColor,
+                                }}
+                              />
+                            </button>
+                            {labelMenuIdx === i && (
+                              <div
+                                className="absolute right-0 bottom-full mb-1.5 flex items-center gap-1 px-2 py-1.5 rounded-xl border shadow-lg z-20"
+                                style={{ backgroundColor: isDark ? "#1f2937" : "white", borderColor: border }}
+                              >
+                                {LABEL_COLORS.map(lc => (
+                                  <button
+                                    key={lc.name}
+                                    onClick={() => applyLabel(i, lc.bg)}
+                                    className="w-5 h-5 rounded-full hover:scale-125 transition-transform ring-offset-1 hover:ring-2"
+                                    style={{ backgroundColor: lc.bg, outlineColor: lc.bg }}
+                                    title={lc.name}
+                                  />
+                                ))}
+                                {labelColor && (
+                                  <button
+                                    onClick={() => applyLabel(i, null)}
+                                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center hover:scale-125 transition-transform"
+                                    style={{ borderColor: mutedColor }}
+                                    title="Remove label"
+                                  >
+                                    <X size={9} style={{ color: mutedColor }} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
