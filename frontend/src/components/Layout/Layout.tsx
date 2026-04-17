@@ -2,7 +2,6 @@ import { Outlet } from "react-router-dom";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "./Sidebar.tsx";
-import Header  from "./Header.tsx";
 import AppNavbar from "./AppNavbar.tsx";
 import ComposeModal from "../Mail/ComposeModal.tsx";
 import Toast from "../ui/Toast.tsx";
@@ -32,7 +31,6 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar />
         <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
-          <Header />
           <main className="flex flex-col flex-1 min-h-0 overflow-auto">
             <Outlet />
           </main>
