@@ -41,7 +41,14 @@
       "Bash(grep -v warning sleep 8 docker logs mailserver-postfix --tail 20)",
       "Bash(grep -v \"^$\")",
       "Bash(/dev/null sleep:*)",
-      "Bash(grep -n \"Stored on\\\\|storageInfo\\\\|storage-info\\\\|location.*maildata\\\\|files\\\\\\\\\\\\\\\\\" \"d:/Language prop/Mail/frontend/src/pages/Files.tsx\")"
+      "Bash(grep -n \"Stored on\\\\|storageInfo\\\\|storage-info\\\\|location.*maildata\\\\|files\\\\\\\\\\\\\\\\\" \"d:/Language prop/Mail/frontend/src/pages/Files.tsx\")",
+      "Bash(where wkhtmltopdf:*)",
+      "Bash(where pandoc:*)",
+      "Bash(node -e \"require\\('puppeteer'\\)\")",
+      "Bash(node -e \"require\\('puppeteer-core'\\)\")",
+      "Bash(npx --yes puppeteer --version)",
+      "Bash(node -e ':*)",
+      "Bash(node generate-pdf.mjs)"
     ],
     "additionalDirectories": [
       "\\^# --- Outbound SMTP Relay (Brevo) ---\\,\\^smtp_tls_wrappermode.*$",

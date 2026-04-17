@@ -98,7 +98,7 @@ export default function GuidePage() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-6">
+    <div className="flex flex-col bg-[#f8fafc] p-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
@@ -202,6 +202,26 @@ export default function GuidePage() {
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs font-semibold text-[#5f6368] uppercase tracking-wider mb-2">Webmail</p>
               <Row label="URL" value={webmailUrl} />
+            </div>
+          </div>
+
+          {/* Email send checklist */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-[#202124] mb-3 flex items-center gap-2">
+              <Mail size={15} className="text-indigo-500" /> Send Email Checklist
+            </h2>
+            <div className="space-y-3 text-sm text-[#475569]">
+              <p>
+                Before sending mail, make sure your domain DNS is set up and propagated. If mail shows as delivered but is not received, the remote server may still reject it.
+              </p>
+              <ul className="list-disc list-inside space-y-2">
+                <li>Use a valid external recipient address and send from <strong>username@{host}</strong>.</li>
+                <li>Verify your DNS records in the DNS tab first: MX, SPF, DKIM, and DMARC.</li>
+                <li>If delivery fails, check the mail queue and server logs for blocked or bounced messages.</li>
+              </ul>
+              <p className="text-xs text-[#64748b]">
+                Tip: If you are still testing, send to another inbox you control and verify the receiving server isn’t marking the message as spam.
+              </p>
             </div>
           </div>
 

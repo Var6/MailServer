@@ -1,33 +1,10 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import {
-  Mail, Calendar, Users, Folder, Settings, LogOut,
-  Building2, UserCog, Receipt, BookOpen, ChevronDown,
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Settings, LogOut, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "../../store/index.ts";
 import { useTheme } from "../../lib/themes.ts";
 import { avatarColor } from "../../lib/utils.ts";
 import { logout } from "../../api/authApi.ts";
-
-const USER_NAV = [
-  { to: "/mail/INBOX",  icon: Mail,     label: "Mail" },
-  { to: "/calendar",    icon: Calendar, label: "Calendar" },
-  { to: "/files",       icon: Folder,   label: "Files" },
-  { to: "/contacts",    icon: Users,    label: "Contacts" },
-];
-
-const ADMIN_NAV = [
-  { to: "/admin/users", icon: UserCog,  label: "Users" },
-  { to: "/admin/guide", icon: BookOpen, label: "Guide" },
-  { to: "/calendar",    icon: Calendar, label: "Calendar" },
-  { to: "/files",       icon: Folder,   label: "Files" },
-  { to: "/contacts",    icon: Users,    label: "Contacts" },
-];
-
-const SUPERADMIN_NAV = [
-  { to: "/superadmin/tenants", icon: Building2, label: "Tenants" },
-  { to: "/superadmin/billing", icon: Receipt,   label: "Billing" },
-];
 
 export default function AppNavbar() {
   const { email, displayName, role, avatar, clearAuth } = useAuthStore();

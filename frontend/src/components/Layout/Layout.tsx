@@ -29,11 +29,11 @@ export default function Layout() {
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: appBg }}>
       <AppNavbar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar />
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-hidden">
+          <main className="flex flex-col flex-1 min-h-0 overflow-auto">
             <Outlet />
           </main>
         </div>
