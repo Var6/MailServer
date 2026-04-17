@@ -311,13 +311,13 @@ export default function ComposeModal() {
           <span className="text-sm truncate" style={{ color: t.text }}>{authName ? `${authName} <${authEmail}>` : authEmail}</span>
         </div>
         {/* To field with autocomplete */}
-        <div className="flex items-center gap-0 px-4 border-b" style={{ borderColor: t.borderLight }}>
-          <span className="text-xs w-6 flex-shrink-0" style={{ color: t.muted }}>To</span>
+        <div className="flex items-start gap-0 px-4 border-b flex-wrap" style={{ borderColor: t.borderLight }}>
+          <span className="text-xs w-6 flex-shrink-0 pt-2.5" style={{ color: t.muted }}>To</span>
           <RecipientInput
             value={to} onChange={setTo} placeholder="Recipients"
             t={t} localFallback={knownRecipients.current} autoFocus={!replyTo}
           />
-          <div className="flex items-center gap-1 text-xs" style={{ color: t.muted }}>
+          <div className="flex items-center gap-1 text-xs pt-2" style={{ color: t.muted }}>
             {!showCc  && <button onClick={() => setShowCc(true)}  className="px-1 hover:opacity-80">Cc</button>}
             {!showBcc && <button onClick={() => setShowBcc(true)} className="px-1 hover:opacity-80">Bcc</button>}
           </div>
@@ -488,43 +488,92 @@ function RecipientInput({
   localFallback: string[];
   autoFocus?: boolean;
 }) {
+  const isDark = t.bg === "#1f2937" || t.bg.startsWith("#1") || t.bg.startsWith("#0");
+  const [chips, setChips] = useState<string[]>(() =>
+    value ? value.split(",").map(v => v.trim()).filter(Boolean) : []
+  );
+  const [inputVal, setInputVal] = useState("");
   const [suggestions, setSuggestions] = useState<Array<{ name: string; address: string }>>([]);
   const [show, setShow] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const syncParent = (newChips: string[]) => onChange(newChips.join(", "));
+
+  const commit = (raw: string) => {
+    const trimmed = raw.trim().replace(/,+$/, "").trim();
+    if (!trimmed) return;
+    const next = [...chips, trimmed];
+    setChips(next);
+    setInputVal("");
+    syncParent(next);
+    setShow(false);
+  };
+
+  const removeChip = (idx: number) => {
+    const next = chips.filter((_, i) => i !== idx);
+    setChips(next);
+    syncParent(next);
+  };
+
   const query = (val: string) => {
-    const last = val.split(",").pop()?.trim() ?? "";
-    if (last.length < 1) { setShow(false); return; }
+    if (val.length < 1) { setShow(false); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const results = await getContactSuggestions(last);
+        const results = await getContactSuggestions(val);
         setSuggestions(results);
         setShow(results.length > 0);
       } catch {
-        const matches = localFallback.filter(r => r.includes(last.toLowerCase()));
+        const matches = localFallback.filter(r => r.includes(val.toLowerCase()));
         setSuggestions(matches.map(a => ({ address: a, name: "" })));
         setShow(matches.length > 0);
       }
     }, 200);
   };
 
-  const pick = (addr: string) => {
-    const parts = value.split(",");
-    parts[parts.length - 1] = " " + addr;
-    onChange(parts.join(",").trimStart() + ", ");
-    setShow(false);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "," || e.key === "Enter") {
+      e.preventDefault();
+      commit(inputVal);
+    } else if (e.key === "Backspace" && inputVal === "" && chips.length > 0) {
+      removeChip(chips.length - 1);
+    }
   };
 
+  const chipBg   = isDark ? "#1e3a5f" : "#dbeafe";
+  const chipText = isDark ? "#93c5fd" : "#1d4ed8";
+
   return (
-    <div className="relative flex-1">
+    <div
+      className="relative flex-1 flex flex-wrap gap-1 items-center py-1.5 cursor-text"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {chips.map((chip, i) => (
+        <span
+          key={i}
+          className="flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+          style={{ backgroundColor: chipBg, color: chipText }}
+        >
+          {chip}
+          <button
+            type="button"
+            onMouseDown={e => { e.preventDefault(); removeChip(i); }}
+            className="rounded-full hover:opacity-70 transition-opacity"
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
       <input
-        value={value}
-        onChange={e => { onChange(e.target.value); query(e.target.value); }}
-        onFocus={() => query(value)}
-        onBlur={() => setTimeout(() => setShow(false), 150)}
-        placeholder={placeholder}
-        className="w-full outline-none text-sm py-2 bg-transparent"
+        ref={inputRef}
+        value={inputVal}
+        onChange={e => { setInputVal(e.target.value); query(e.target.value); }}
+        onKeyDown={handleKeyDown}
+        onFocus={() => query(inputVal)}
+        onBlur={() => { commit(inputVal); setTimeout(() => setShow(false), 150); }}
+        placeholder={chips.length === 0 ? placeholder : ""}
+        className="outline-none text-sm bg-transparent flex-1 min-w-[80px] py-0.5"
         style={{ color: t.text }}
         autoFocus={autoFocus}
       />
@@ -534,7 +583,7 @@ function RecipientInput({
           {suggestions.map(s => (
             <button
               key={s.address}
-              onMouseDown={() => pick(s.address)}
+              onMouseDown={() => { commit(s.address); setShow(false); }}
               className="w-full text-left px-4 py-2 text-sm"
               style={{ color: t.text }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = t.hoverBg)}

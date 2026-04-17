@@ -1,7 +1,7 @@
 import { useNavigate, NavLink } from "react-router-dom";
 import { Mail, Settings, LogOut, ChevronDown, Search, Mail as MailIcon, Calendar, Users, Folder, BookOpen, Building2, Receipt, UserCog } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useAuthStore, useMailStore } from "../../store/index.ts";
+import { useAuthStore, useMailStore, useUiThemeStore } from "../../store/index.ts";
 import { useTheme } from "../../lib/themes.ts";
 import { avatarColor } from "../../lib/utils.ts";
 import { logout } from "../../api/authApi.ts";
@@ -31,6 +31,7 @@ export default function AppNavbar() {
   const searchQuery = useMailStore(s => s.searchQuery);
   const setSearchQuery = useMailStore(s => s.setSearchQuery);
   const { appBg, textColor, isDark } = useTheme();
+  const toggleSidebar = useUiThemeStore(s => s.toggleSidebar);
   const navigate = useNavigate();
   const [dropOpen, setDropOpen] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -72,13 +73,19 @@ export default function AppNavbar() {
         className="flex items-center px-4 h-14 border-b flex-shrink-0 gap-3"
         style={{ background: appBg, color: textColor, borderColor }}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-2 mr-2 flex-shrink-0">
+        {/* Logo — clicks to collapse/expand sidebar */}
+        <button
+          onClick={toggleSidebar}
+          className="flex items-center gap-2 mr-2 flex-shrink-0 rounded-lg px-1 py-1 transition-colors"
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = isDark ? "#374151" : "#f3f4f6")}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+          title="Toggle sidebar"
+        >
           <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
             <Mail size={14} className="text-white" />
           </div>
           <span className="font-semibold text-sm tracking-tight">MailServer</span>
-        </div>
+        </button>
 
         {/* Nav links */}
         <div className="flex items-center gap-0.5 flex-shrink-0">

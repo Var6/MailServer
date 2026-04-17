@@ -67,9 +67,9 @@ export default function Sidebar() {
   const { selectedFolder, setFolder, openCompose } = useMailStore();
   const appBg = useUiThemeStore((s) => s.appBg);
   const setAppBg = useUiThemeStore((s) => s.setAppBg);
+  const collapsed = useUiThemeStore((s) => s.sidebarCollapsed);
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const themeRef = useRef<HTMLDivElement>(null);
@@ -163,19 +163,6 @@ export default function Sidebar() {
       className={`${collapsed ? "w-20" : "w-64"} flex flex-col h-full border-r select-none shadow-sm transition-all`}
       style={{ background: appBg, color: textColor, borderColor: isDark ? "#374151" : "#e5e7eb" }}
     >
-      {/* Header — click logo/name to collapse/expand */}
-      <div className="px-3 py-3 border-b" style={{ borderColor: isDark ? "#374151" : "#e5e7eb" }}>
-        <button
-          onClick={() => setCollapsed((v) => !v)}
-          className="flex items-center gap-2 w-full rounded transition hover:opacity-80"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Mail size={16} className="text-white" />
-          </div>
-          {!collapsed && <span className="font-semibold text-base tracking-tight truncate">MailServer</span>}
-        </button>
-      </div>
 
       {/* Compose button */}
       {role !== "superadmin" && (

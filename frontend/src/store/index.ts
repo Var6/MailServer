@@ -117,6 +117,8 @@ export const useToastStore = create<ToastState>()((set) => ({
 interface UiThemeState {
   appBg: string;
   setAppBg: (color: string) => void;
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
 }
 
 export const useUiThemeStore = create<UiThemeState>()(
@@ -124,6 +126,8 @@ export const useUiThemeStore = create<UiThemeState>()(
     (set) => ({
       appBg: "#f5f7fb",
       setAppBg: (appBg) => set({ appBg }),
+      sidebarCollapsed: false,
+      toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
     }),
     { name: "ui-theme" }
   )
