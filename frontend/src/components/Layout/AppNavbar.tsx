@@ -17,11 +17,6 @@ export default function AppNavbar() {
   const borderColor = isDark ? "#374151" : "#e5e7eb";
   const hoverBg = isDark ? "#374151" : "#f3f4f6";
 
-  const navItems =
-    role === "superadmin" ? SUPERADMIN_NAV :
-    role === "admin"      ? ADMIN_NAV :
-    USER_NAV;
-
   useEffect(() => {
     if (!dropOpen) return;
     const handler = (e: MouseEvent) => {
@@ -55,29 +50,7 @@ export default function AppNavbar() {
         <span className="font-semibold text-sm tracking-tight">MailServer</span>
       </div>
 
-      {/* Nav links */}
-      <div className="flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-none">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                isActive
-                  ? isDark
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-100 text-blue-800"
-                  : isDark
-                    ? "text-gray-300 hover:bg-gray-700"
-                    : "text-gray-600 hover:bg-gray-100"
-              }`
-            }
-          >
-            <Icon size={15} />
-            {label}
-          </NavLink>
-        ))}
-      </div>
+      <div className="flex-1" />
 
       {/* Right: profile dropdown */}
       <div ref={dropRef} className="relative flex-shrink-0">

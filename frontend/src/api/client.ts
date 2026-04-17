@@ -18,10 +18,15 @@ apiClient.interceptors.request.use((cfg) => {
   return cfg;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401; force re-login on 511 (session_expired = password missing)
 apiClient.interceptors.response.use(
   (r) => r,
   async (err) => {
+    if (err.response?.status === 511) {
+      useAuthStore.getState().clearAuth();
+      window.location.href = "/login";
+      return Promise.reject(err);
+    }
     if (err.response?.status === 401 && !err.config._retry) {
       err.config._retry = true;
       try {

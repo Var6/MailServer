@@ -48,11 +48,21 @@
       "Bash(node -e \"require\\('puppeteer-core'\\)\")",
       "Bash(npx --yes puppeteer --version)",
       "Bash(node -e ':*)",
-      "Bash(node generate-pdf.mjs)"
+      "Bash(node generate-pdf.mjs)",
+      "Bash(nslookup -type=MX civiltechstudio.com 8.8.8.8)",
+      "Bash(nslookup -type=TXT civiltechstudio.com 8.8.8.8)",
+      "Bash(nslookup -type=A mail.civiltechstudio.com 8.8.8.8)",
+      "Bash(nslookup -type=TXT mail._domainkey.civiltechstudio.com 8.8.8.8)",
+      "Bash(nslookup -type=TXT _dmarc.civiltechstudio.com 8.8.8.8)",
+      "Bash(Test-NetConnection -ComputerName 223.235.102.153 -Port 25)",
+      "Bash(nc -zv 223.235.102.153 25)",
+      "Bash(nslookup -type=TXT civiltechstudio.com 1.1.1.1)",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 223.235.102.153 -Port 25\")"
     ],
     "additionalDirectories": [
       "\\^# --- Outbound SMTP Relay (Brevo) ---\\,\\^smtp_tls_wrappermode.*$",
-      "\\^smtp_tls_security_level = encrypt$"
+      "\\^smtp_tls_security_level = encrypt$",
+      "C:\\Users\\Ashish\\Desktop"
     ]
   }
 }
